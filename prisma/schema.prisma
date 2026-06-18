@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CompanionType {
+  ROBOT
+  PET
+  ANIME_GIRL
+  SPIRIT
+}
+
+enum CompanionMood {
+  HAPPY
+  NEUTRAL
+  LONELY
+  EXCITED
+}
+
+enum ActivityType {
+  DAILY_CHECK_IN
+  FEED_COMPANION
+  PLAY_MINI_GAME
+  REFLECTION_PROMPT
+  ASK_COMPANION_QUESTION
+}
+
+model User {
+  id            String      @id @default(cuid())
+  walletAddress String      @unique @map("wallet_address")
+  username      String?
+  nonce         String
+  createdAt     DateTime    @default(now()) @map("created_at")
+  companions    Companion[]
+
+  @@map("users")
+}
+
+model Companion {
+  id                String               @id @default(cuid())
+  userId            String               @map("user_id")
+  blockchainId      String?              @unique @map("blockchain_id")
+  name              String
+  type              CompanionType
+  level             Int                  @default(1)
+  xp                Int                  @default(0)
+  mood              CompanionMood        @default(NEUTRAL)
+  relationshipLevel Int                  @default(1) @map("relationship_level")
+  trustScore        Int                  @default(5) @map("trust_score")
+  attachmentScore   Int                  @default(5) @map("attachment_score")
+  evolutionStage    Int                  @default(1) @map("evolution_stage")
+  createdAt         DateTime             @default(now()) @map("created_at")
+  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  memories          Memory[]
+  personality       PersonalityProfile?
+  activityLogs      ActivityLog[]
+  chatLogs          ChatLog[]
+  memorySnapshots   MemorySnapshot[]
+
+  @@index([userId])
+  @@map("companions")
+}
+
+model Memory {
+  id          String    @id @default(cuid())
+  companionId String    @map("companion_id")
+  memoryType  String    @map("memory_type")
+  content     String
+  importance  Int
+  createdAt   DateTime  @default(now()) @map("created_at")
+  companion   Companion @relation(fields: [companionId], references: [id], onDelete: Cascade)
+
+  @@index([companionId, importance])
+  @@map("memories")
+}
+
+model PersonalityProfile {
+  id                 String    @id @default(cuid())
+  companionId        String    @unique @map("companion_id")
+  humorScore         Int       @default(50) @map("humor_score")
+  supportivenessScore Int      @default(50) @map("supportiveness_score")
+  curiosityScore     Int       @default(50) @map("curiosity_score")
+  emotionalScore     Int       @default(50) @map("emotional_score")
+  conciseScore       Int       @default(50) @map("concise_score")
+  companion          Companion @relation(fields: [companionId], references: [id], onDelete: Cascade)
+
+  @@map("personality_profiles")
+}
+
+model ActivityLog {
+  id          String       @id @default(cuid())
+  companionId String       @map("companion_id")
+  activityType ActivityType @map("activity_type")
+  xpEarned    Int          @map("xp_earned")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  companion   Companion    @relation(fields: [companionId], references: [id], onDelete: Cascade)
+
+  @@index([companionId, activityType, createdAt])
+  @@map("activity_logs")
+}
+
+model ChatLog {
+  id                String    @id @default(cuid())
+  companionId       String    @map("companion_id")
+  userMessage       String    @map("user_message")
+  companionResponse String    @map("companion_response")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  companion         Companion @relation(fields: [companionId], references: [id], onDelete: Cascade)
+
+  @@index([companionId, createdAt])
+  @@map("chat_logs")
+}
+
+model MemorySnapshot {
+  id              String    @id @default(cuid())
+  companionId     String    @map("companion_id")
+  rootHash        String    @map("root_hash")
+  snapshotVersion Int       @map("snapshot_version")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  companion       Companion @relation(fields: [companionId], references: [id], onDelete: Cascade)
+
+  @@index([companionId, snapshotVersion])
+  @@map("memory_snapshots")
+}

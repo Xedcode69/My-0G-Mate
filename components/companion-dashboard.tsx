@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Activity, Archive, Bot, Brain, CalendarCheck, Heart, Loader2, MessageCircle, Sparkles, Utensils } from "lucide-react";
+import { usePrivy } from "@privy-io/react-auth";
 import { companionArchetypes, moodLabels, relationshipLabels } from "@/lib/companion/archetypes";
 import { cn } from "@/lib/ui";
 
@@ -32,7 +33,7 @@ const activities: { type: ActivityType; label: string; icon: typeof Activity }[]
 ];
 
 export function CompanionDashboard() {
-  const [wallet, setWallet] = useState("");
+  const { logout, user } = usePrivy();
   const [companions, setCompanions] = useState<Companion[]>([]);
   const [activeId, setActiveId] = useState("");
   const [name, setName] = useState("Nova");
@@ -42,18 +43,15 @@ export function CompanionDashboard() {
   const [moodGuess, setMoodGuess] = useState<CompanionMood>("HAPPY");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const wallet = user?.wallet?.address?.toLowerCase() ?? "";
 
   const active = companions.find((companion) => companion.id === activeId) ?? companions[0];
   const archetype = active ? companionArchetypes[active.type] : companionArchetypes[type];
   const messages = useMemo(() => [...(active?.chatLogs ?? [])].reverse(), [active?.chatLogs]);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem("mymate-wallet");
-    if (stored) {
-      setWallet(stored);
-      void loadCompanions(stored);
-    }
-  }, []);
+    if (wallet) void loadCompanions(wallet);
+  }, [wallet]);
 
   async function request<T>(url: string, init?: RequestInit): Promise<T> {
     const response = await fetch(url, {
@@ -67,37 +65,6 @@ export function CompanionDashboard() {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error ?? "Request failed");
     return data;
-  }
-
-  async function connectWallet() {
-    setBusy(true);
-    setStatus("Connecting wallet");
-    try {
-      const ethereum = (window as unknown as { ethereum?: { request(args: { method: string; params?: unknown[] }): Promise<unknown> } }).ethereum;
-      if (!ethereum) throw new Error("MetaMask is required for wallet sign-in.");
-      const [address] = (await ethereum.request({ method: "eth_requestAccounts" })) as string[];
-      const nonce = await fetch("/api/auth/nonce", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ address })
-      }).then((res) => res.json());
-      const signature = (await ethereum.request({ method: "personal_sign", params: [nonce.message, address] })) as string;
-      const verified = await fetch("/api/auth/verify", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ message: nonce.message, signature })
-      });
-      if (!verified.ok) throw new Error("Wallet signature could not be verified.");
-      const normalized = address.toLowerCase();
-      window.localStorage.setItem("mymate-wallet", normalized);
-      setWallet(normalized);
-      await loadCompanions(normalized);
-      setStatus("Wallet connected");
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Wallet connection failed");
-    } finally {
-      setBusy(false);
-    }
   }
 
   async function loadCompanions(address = wallet) {
@@ -188,12 +155,15 @@ export function CompanionDashboard() {
               <p className="text-sm text-black/60">Persistent AI companions</p>
             </div>
             <button
-              onClick={connectWallet}
+              onClick={logout}
               className="rounded-md bg-ink px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
               disabled={busy}
             >
-              {wallet ? "Connected" : "Connect"}
+              Log out
             </button>
+          </div>
+          <div className="mt-3 truncate rounded-md bg-paper px-3 py-2 text-xs text-black/55">
+            {wallet || "Privy account active"}
           </div>
 
           <div className="mt-5 space-y-3">

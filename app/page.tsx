@@ -1,5 +1,5 @@
-import { CompanionDashboard } from "@/components/companion-dashboard";
+import { AppShell } from "@/components/app-shell";
 
 export default function Home() {
-  return <CompanionDashboard />;
+  return <AppShell />;
 }

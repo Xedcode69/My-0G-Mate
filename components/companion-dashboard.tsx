@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Activity, Archive, Bot, Brain, CalendarCheck, Heart, Loader2, MessageCircle, Sparkles, Utensils } from "lucide-react";
 import { usePrivy } from "@privy-io/react-auth";
 import { companionArchetypes, moodLabels, relationshipLabels } from "@/lib/companion/archetypes";
 import { cn } from "@/lib/ui";
 
-type CompanionType = "ROBOT" | "PET" | "ANIME_GIRL" | "SPIRIT";
+type CompanionType = "ROBOT" | "PET" | "ANIME_GIRL" | "SPIRIT" | "CUSTOM";
 type CompanionMood = "HAPPY" | "NEUTRAL" | "LONELY" | "EXCITED";
 type ActivityType = "DAILY_CHECK_IN" | "FEED_COMPANION" | "PLAY_MINI_GAME" | "REFLECTION_PROMPT";
 
@@ -14,6 +15,9 @@ type Companion = {
   id: string;
   name: string;
   type: CompanionType;
+  avatarKey: string;
+  customTypeName?: string | null;
+  avatarImage?: string | null;
   level: number;
   xp: number;
   mood: CompanionMood;
@@ -34,6 +38,7 @@ const activities: { type: ActivityType; label: string; icon: typeof Activity }[]
 
 export function CompanionDashboard() {
   const { logout, user } = usePrivy();
+  const router = useRouter();
   const [companions, setCompanions] = useState<Companion[]>([]);
   const [activeId, setActiveId] = useState("");
   const [name, setName] = useState("Nova");
@@ -47,6 +52,7 @@ export function CompanionDashboard() {
 
   const active = companions.find((companion) => companion.id === activeId) ?? companions[0];
   const archetype = active ? companionArchetypes[active.type] : companionArchetypes[type];
+  const activeTypeLabel = active?.customTypeName || archetype.label;
   const messages = useMemo(() => [...(active?.chatLogs ?? [])].reverse(), [active?.chatLogs]);
 
   useEffect(() => {
@@ -70,8 +76,10 @@ export function CompanionDashboard() {
   async function loadCompanions(address = wallet) {
     if (!address) return;
     const data = await fetch("/api/companions", { headers: { "x-wallet-address": address } }).then((res) => res.json());
-    setCompanions(data.companions ?? []);
-    setActiveId(data.companions?.[0]?.id ?? "");
+    const loaded = data.companions ?? [];
+    setCompanions(loaded);
+    setActiveId(loaded[0]?.id ?? "");
+    if (loaded.length === 0) router.replace("/onboarding");
   }
 
   async function createCompanion() {
@@ -79,7 +87,7 @@ export function CompanionDashboard() {
     try {
       const data = await request<{ companion: Companion }>("/api/companions", {
         method: "POST",
-        body: JSON.stringify({ name, type })
+        body: JSON.stringify({ name, type, avatarKey: `${type.toLowerCase()}-default` })
       });
       setCompanions((current) => [data.companion, ...current]);
       setActiveId(data.companion.id);
@@ -154,41 +162,22 @@ export function CompanionDashboard() {
               <h1 className="text-2xl font-semibold">MyMate</h1>
               <p className="text-sm text-black/60">Persistent AI companions</p>
             </div>
-            <button
-              onClick={logout}
-              className="rounded-md bg-ink px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-              disabled={busy}
-            >
+            <button onClick={logout} className="rounded-md bg-ink px-3 py-2 text-sm font-medium text-white disabled:opacity-60" disabled={busy}>
               Log out
             </button>
           </div>
-          <div className="mt-3 truncate rounded-md bg-paper px-3 py-2 text-xs text-black/55">
-            {wallet || "Privy account active"}
-          </div>
+          <div className="mt-3 truncate rounded-md bg-paper px-3 py-2 text-xs text-black/55">{wallet || "Privy account active"}</div>
 
           <div className="mt-5 space-y-3">
-            <input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              className="w-full rounded-md border border-black/10 bg-white px-3 py-2"
-              placeholder="Companion name"
-            />
+            <input value={name} onChange={(event) => setName(event.target.value)} className="w-full rounded-md border border-black/10 bg-white px-3 py-2" placeholder="Companion name" />
             <div className="grid grid-cols-2 gap-2">
               {(Object.keys(companionArchetypes) as CompanionType[]).map((key) => (
-                <button
-                  key={key}
-                  onClick={() => setType(key)}
-                  className={cn("rounded-md border px-3 py-2 text-left text-sm", type === key ? "border-ink bg-ink text-white" : "border-black/10 bg-white")}
-                >
+                <button key={key} onClick={() => setType(key)} className={cn("rounded-md border px-3 py-2 text-left text-sm", type === key ? "border-ink bg-ink text-white" : "border-black/10 bg-white")}>
                   {companionArchetypes[key].label}
                 </button>
               ))}
             </div>
-            <button
-              onClick={createCompanion}
-              disabled={!wallet || busy}
-              className="flex w-full items-center justify-center gap-2 rounded-md bg-ember px-3 py-2 font-medium text-white disabled:opacity-50"
-            >
+            <button onClick={createCompanion} disabled={!wallet || busy} className="flex w-full items-center justify-center gap-2 rounded-md bg-ember px-3 py-2 font-medium text-white disabled:opacity-50">
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
               Create companion
             </button>
@@ -196,11 +185,7 @@ export function CompanionDashboard() {
 
           <div className="mt-5 space-y-2">
             {companions.map((companion) => (
-              <button
-                key={companion.id}
-                onClick={() => setActiveId(companion.id)}
-                className={cn("w-full rounded-md border p-3 text-left", active?.id === companion.id ? "border-ink bg-white" : "border-black/10 bg-white/60")}
-              >
+              <button key={companion.id} onClick={() => setActiveId(companion.id)} className={cn("w-full rounded-md border p-3 text-left", active?.id === companion.id ? "border-ink bg-white" : "border-black/10 bg-white/60")}>
                 <div className="font-medium">{companion.name}</div>
                 <div className="text-xs text-black/55">
                   L{companion.level} / {relationshipLabels[companion.relationshipLevel]} / {moodLabels[companion.mood]}
@@ -214,7 +199,7 @@ export function CompanionDashboard() {
           <div className="avatar-stage relative min-h-[240px] border-b border-black/10 p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <div className="text-sm font-medium text-black/55">{archetype.background}</div>
+                <div className="text-sm font-medium text-black/55">{activeTypeLabel} / {archetype.background}</div>
                 <h2 className="mt-1 text-3xl font-semibold">{active?.name ?? "Choose a companion"}</h2>
                 <p className="mt-2 max-w-xl text-sm text-black/65">{archetype.evolution}</p>
               </div>
@@ -226,8 +211,14 @@ export function CompanionDashboard() {
             </div>
             <div className="mx-auto mt-6 grid h-36 w-36 place-items-center rounded-full border-4 border-white text-center shadow-lg" style={{ backgroundColor: archetype.accent }}>
               <div className="text-white">
-                <Sparkles className="mx-auto h-8 w-8" />
-                <div className="mt-2 text-xl font-semibold">{active?.evolutionStage === 2 ? archetype.stageTwoAvatar : archetype.stageOneAvatar}</div>
+                {active?.avatarImage ? (
+                  <img src={active.avatarImage} alt={`${active.name} avatar`} className="mx-auto h-24 w-24 rounded-full object-cover" />
+                ) : (
+                  <>
+                    <Sparkles className="mx-auto h-8 w-8" />
+                    <div className="mt-2 text-xl font-semibold">{active?.avatarKey ?? (active?.evolutionStage === 2 ? archetype.stageTwoAvatar : archetype.stageOneAvatar)}</div>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -244,15 +235,7 @@ export function CompanionDashboard() {
 
           <div className="border-t border-black/10 p-4">
             <div className="flex gap-2">
-              <input
-                value={message}
-                onChange={(event) => setMessage(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") void sendMessage();
-                }}
-                className="min-w-0 flex-1 rounded-md border border-black/10 bg-white px-3 py-2"
-                placeholder="Tell your companion something..."
-              />
+              <input value={message} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void sendMessage(); }} className="min-w-0 flex-1 rounded-md border border-black/10 bg-white px-3 py-2" placeholder="Tell your companion something..." />
               <button onClick={sendMessage} disabled={!active || busy} className="rounded-md bg-mint px-4 py-2 font-medium text-white disabled:opacity-50">
                 <MessageCircle className="h-4 w-4" />
               </button>
@@ -284,23 +267,14 @@ export function CompanionDashboard() {
             </div>
             <select value={moodGuess} onChange={(event) => setMoodGuess(event.target.value as CompanionMood)} className="mt-3 w-full rounded-md border border-black/10 bg-white px-3 py-2 text-sm">
               {Object.keys(moodLabels).map((mood) => (
-                <option key={mood} value={mood}>
-                  {moodLabels[mood as CompanionMood]}
-                </option>
+                <option key={mood} value={mood}>{moodLabels[mood as CompanionMood]}</option>
               ))}
             </select>
-            <textarea
-              value={reflection}
-              onChange={(event) => setReflection(event.target.value)}
-              className="mt-3 min-h-20 w-full rounded-md border border-black/10 bg-white px-3 py-2 text-sm"
-              placeholder="Daily reflection"
-            />
+            <textarea value={reflection} onChange={(event) => setReflection(event.target.value)} className="mt-3 min-h-20 w-full rounded-md border border-black/10 bg-white px-3 py-2 text-sm" placeholder="Daily reflection" />
           </div>
 
           <div className="rounded-lg border border-black/10 bg-white/78 p-4 shadow-sm">
-            <h3 className="flex items-center gap-2 font-semibold">
-              <Heart className="h-4 w-4" /> Memories
-            </h3>
+            <h3 className="flex items-center gap-2 font-semibold"><Heart className="h-4 w-4" /> Memories</h3>
             <div className="mt-3 space-y-2">
               {(active?.memories ?? []).length === 0 && <p className="text-sm text-black/55">No long-term memories yet.</p>}
               {(active?.memories ?? []).map((memory) => (

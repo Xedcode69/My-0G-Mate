@@ -12,6 +12,7 @@ enum CompanionType {
   PET
   ANIME_GIRL
   SPIRIT
+  CUSTOM
 }
 
 enum CompanionMood {
@@ -46,6 +47,9 @@ model Companion {
   blockchainId      String?              @unique @map("blockchain_id")
   name              String
   type              CompanionType
+  avatarKey         String               @default("default") @map("avatar_key")
+  customTypeName    String?              @map("custom_type_name")
+  avatarImage       String?              @map("avatar_image")
   level             Int                  @default(1)
   xp                Int                  @default(0)
   mood              CompanionMood        @default(NEUTRAL)

@@ -51,6 +51,16 @@ export const companionArchetypes: Record<CompanionType, CompanionArchetype> = {
     stageOneAvatar: "Wisp",
     stageTwoAvatar: "Wisp+",
     accent: "#7b61a8"
+  },
+  CUSTOM: {
+    type: "CUSTOM",
+    label: "Custom",
+    traits: ["Personal", "Flexible", "Adaptive", "User-defined"],
+    background: "Personalized space",
+    evolution: "Grows around the user's selected interests and style.",
+    stageOneAvatar: "Custom",
+    stageTwoAvatar: "Custom+",
+    accent: "#5f6f52"
   }
 };
 

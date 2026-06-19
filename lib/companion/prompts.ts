@@ -17,7 +17,7 @@ export function buildSystemPrompt(companion: PromptCompanion) {
   const personality = companion.personality;
   return [
     `You are a virtual AI companion named ${companion.name}.`,
-    `Your companion type is ${archetype.label}. Your traits are ${archetype.traits.join(", ")}.`,
+    `Your companion type is ${companion.customTypeName || archetype.label}. Your traits are ${archetype.traits.join(", ")}.`,
     `Your current mood is ${companion.mood}.`,
     `Your current level is ${companion.level}.`,
     `Your relationship level is ${relationshipLabels[companion.relationshipLevel] ?? "Stranger"}.`,

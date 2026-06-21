@@ -68,13 +68,16 @@ export function OnboardingPage() {
   const [agentRole, setAgentRole] = useState(defaultAgentTemplate.role);
   const [agentMission, setAgentMission] = useState(defaultAgentTemplate.mission);
   const [agentScope, setAgentScope] = useState(defaultAgentTemplate.scope.join(", "));
+  const [personalContextOpen, setPersonalContextOpen] = useState(true);
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const wallet = user?.wallet?.address?.toLowerCase() ?? "";
+  const selectedAgentTemplate = agentTemplates.find((template) => template.id === agentTemplateId) ?? defaultAgentTemplate;
   const selectedTypeLabel = type === "CUSTOM" && customTypeName.trim() ? customTypeName.trim() : companionArchetypes[type].label;
   const canCreate = useMemo(() => {
-    return Boolean(name.trim() && interests.length > 0 && agentRole.trim() && agentMission.trim() && agentScope.split(",").some((item) => item.trim()) && (type !== "CUSTOM" || customTypeName.trim()));
-  }, [agentMission, agentRole, agentScope, customTypeName, interests.length, name, type]);
+    const interestsReady = agentTemplateId !== defaultAgentTemplate.id || interests.length > 0;
+    return Boolean(name.trim() && interestsReady && agentRole.trim() && agentMission.trim() && agentScope.split(",").some((item) => item.trim()) && (type !== "CUSTOM" || customTypeName.trim()));
+  }, [agentMission, agentRole, agentScope, agentTemplateId, customTypeName, interests.length, name, type]);
 
   if (!ready) {
     return (
@@ -140,6 +143,7 @@ export function OnboardingPage() {
     setAgentRole(template.role);
     setAgentMission(template.mission);
     setAgentScope(template.scope.join(", "));
+    setPersonalContextOpen(template.id === defaultAgentTemplate.id);
   }
 
   function toggleInterest(interest: string) {
@@ -270,41 +274,35 @@ export function OnboardingPage() {
             </div>
           </section>
 
-          <section className="rounded-lg border border-black/10 bg-white/80 p-5 shadow-sm">
-            <h2 className="text-lg font-semibold">Personalized areas</h2>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {interestOptions.map((interest) => (
-                <button
-                  key={interest}
-                  onClick={() => toggleInterest(interest)}
-                  className={cn("rounded-md border px-3 py-2 text-sm", interests.includes(interest) ? "border-mint bg-mint text-white" : "border-black/10 bg-white")}
-                >
-                  {interest}
-                </button>
-              ))}
+          <details open={personalContextOpen} onToggle={(event) => setPersonalContextOpen(event.currentTarget.open)} className="rounded-lg border border-black/10 bg-white/80 shadow-sm">
+            <summary className="flex cursor-pointer list-none items-center justify-between p-5">
+              <div><h2 className="text-lg font-semibold">Personal context</h2><p className="mt-1 text-sm text-black/55">{agentTemplateId === defaultAgentTemplate.id ? "Your interests help shape everyday conversation." : "Optional interests that help this focused agent tailor its work."}</p></div>
+              <span className="rounded-full bg-paper px-2 py-1 text-xs text-black/55">{interests.length} selected</span>
+            </summary>
+            <div className="border-t border-black/10 px-5 pb-5 pt-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-black/45">Suggested for {selectedAgentTemplate.label}</div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {selectedAgentTemplate.suggestedInterests.map((interest) => (
+                  <button key={interest} onClick={() => toggleInterest(interest)} className={cn("rounded-md border px-3 py-2 text-sm", interests.includes(interest) ? "border-mint bg-mint text-white" : "border-mint/30 bg-mint/5 text-black/70")}>
+                    {interests.includes(interest) ? "✓ " : "+ "}{interest}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-4 text-xs font-semibold uppercase tracking-wide text-black/45">More interests</div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {interestOptions.filter((interest) => !selectedAgentTemplate.suggestedInterests.includes(interest)).map((interest) => (
+                  <button key={interest} onClick={() => toggleInterest(interest)} className={cn("rounded-md border px-3 py-2 text-sm", interests.includes(interest) ? "border-mint bg-mint text-white" : "border-black/10 bg-white")}>
+                    {interest}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-4 flex gap-2">
+                <input value={customInterest} onChange={(event) => setCustomInterest(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") addCustomInterest(); }} className="min-w-0 flex-1 rounded-md border border-black/10 bg-white px-3 py-2" placeholder="Add another interest" />
+                <button onClick={addCustomInterest} className="rounded-md bg-mint px-3 py-2 text-white" aria-label="Add interest"><Plus className="h-4 w-4" /></button>
+              </div>
+              {interests.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{interests.map((interest) => <button key={interest} onClick={() => toggleInterest(interest)} className="rounded-md bg-paper px-3 py-2 text-sm">{interest} ×</button>)}</div>}
             </div>
-            <div className="mt-4 flex gap-2">
-              <input
-                value={customInterest}
-                onChange={(event) => setCustomInterest(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") addCustomInterest();
-                }}
-                className="min-w-0 flex-1 rounded-md border border-black/10 bg-white px-3 py-2"
-                placeholder="Add another area"
-              />
-              <button onClick={addCustomInterest} className="rounded-md bg-mint px-3 py-2 text-white">
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {interests.map((interest) => (
-                <button key={interest} onClick={() => toggleInterest(interest)} className="rounded-md bg-paper px-3 py-2 text-sm">
-                  {interest}
-                </button>
-              ))}
-            </div>
-          </section>
+          </details>
 
           <section className="rounded-lg border border-black/10 bg-white/80 p-5 shadow-sm">
             <h2 className="text-lg font-semibold">Your companion's role</h2>

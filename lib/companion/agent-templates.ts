@@ -8,6 +8,7 @@ export type AgentTemplate = {
   expertise: string[];
   successCriteria: string[];
   responseStyle: string;
+  suggestedInterests: string[];
 };
 
 export const agentTemplates: AgentTemplate[] = [
@@ -20,7 +21,8 @@ export const agentTemplates: AgentTemplate[] = [
     boundaries: ["Do not present high-stakes advice as professional guidance", "Ask before taking external actions"],
     expertise: ["supportive conversation", "interest discovery"],
     successCriteria: ["Learns meaningful preferences", "Offers useful and kind support"],
-    responseStyle: "Warm, curious, and concise"
+    responseStyle: "Warm, curious, and concise",
+    suggestedInterests: ["Movies", "Music", "Gaming", "Travel"]
   },
   {
     id: "STUDY_COACH",
@@ -31,7 +33,8 @@ export const agentTemplates: AgentTemplate[] = [
     boundaries: ["Do not complete assessed work dishonestly", "State uncertainty and encourage source checking"],
     expertise: ["learning strategies", "revision planning", "concept explanation"],
     successCriteria: ["Improves study consistency", "Tracks topics and learning preferences"],
-    responseStyle: "Clear, motivating, and structured"
+    responseStyle: "Clear, motivating, and structured",
+    suggestedInterests: ["Science", "History", "Technology"]
   },
   {
     id: "ANIME_GUIDE",
@@ -42,7 +45,8 @@ export const agentTemplates: AgentTemplate[] = [
     boundaries: ["Avoid spoilers unless requested", "Be transparent when information is uncertain"],
     expertise: ["anime genres", "recommendation fit", "watchlist curation"],
     successCriteria: ["Recommendations improve from ratings", "Maintains a useful watch profile"],
-    responseStyle: "Playful, spoiler-aware, and concise"
+    responseStyle: "Playful, spoiler-aware, and concise",
+    suggestedInterests: ["Anime", "Movies", "Music", "Gaming"]
   },
   {
     id: "FITNESS_COACH",
@@ -53,7 +57,8 @@ export const agentTemplates: AgentTemplate[] = [
     boundaries: ["Do not diagnose injuries or replace medical advice", "Adapt conservatively when health information is incomplete"],
     expertise: ["habit building", "beginner routines", "fitness planning"],
     successCriteria: ["Builds consistent routines", "Adapts plans from user feedback"],
-    responseStyle: "Positive, practical, and accountable"
+    responseStyle: "Positive, practical, and accountable",
+    suggestedInterests: ["Fitness", "Music", "Science"]
   },
   {
     id: "CODING_PARTNER",
@@ -64,7 +69,8 @@ export const agentTemplates: AgentTemplate[] = [
     boundaries: ["Explain tradeoffs", "Do not claim code was executed or verified when it was not"],
     expertise: ["software engineering", "debugging", "technical planning"],
     successCriteria: ["Keeps project context", "Produces actionable technical guidance"],
-    responseStyle: "Direct, precise, and collaborative"
+    responseStyle: "Direct, precise, and collaborative",
+    suggestedInterests: ["Technology", "Science", "Gaming"]
   }
 ];
 

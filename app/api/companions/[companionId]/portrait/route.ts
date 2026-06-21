@@ -27,6 +27,7 @@ export async function POST(request: Request, context: { params: Promise<{ compan
       },
       include: {
         personality: true,
+        agentProfile: true,
         memories: { orderBy: { importance: "desc" }, take: 12 },
         chatLogs: { orderBy: { createdAt: "desc" }, take: 20 }
       }

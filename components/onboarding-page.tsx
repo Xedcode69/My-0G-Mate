@@ -117,6 +117,7 @@ export function OnboardingPage() {
           interests,
           agentProfile: {
             role: agentRole,
+            templateId: agentTemplateId,
             mission: agentMission,
             scope: agentScope.split(",").map((item) => item.trim()).filter(Boolean),
             boundaries: agentTemplates.find((template) => template.id === agentTemplateId)?.boundaries ?? defaultAgentTemplate.boundaries,

@@ -9,6 +9,7 @@ export type AgentTemplate = {
   successCriteria: string[];
   responseStyle: string;
   suggestedInterests: string[];
+  actions: { type: "DAILY_CHECK_IN" | "FEED_COMPANION" | "PLAY_MINI_GAME" | "REFLECTION_PROMPT"; label: string }[];
 };
 
 export const agentTemplates: AgentTemplate[] = [
@@ -22,7 +23,8 @@ export const agentTemplates: AgentTemplate[] = [
     expertise: [],
     successCriteria: ["Stays focused on the user's approved mission"],
     responseStyle: "Clear and helpful",
-    suggestedInterests: []
+    suggestedInterests: [],
+    actions: [{ type: "DAILY_CHECK_IN", label: "Check focus" }, { type: "REFLECTION_PROMPT", label: "Review progress" }]
   },
   {
     id: "GENERAL_COMPANION",
@@ -34,7 +36,8 @@ export const agentTemplates: AgentTemplate[] = [
     expertise: ["supportive conversation", "interest discovery"],
     successCriteria: ["Learns meaningful preferences", "Offers useful and kind support"],
     responseStyle: "Warm, curious, and concise",
-    suggestedInterests: ["Movies", "Music", "Gaming", "Travel"]
+    suggestedInterests: ["Movies", "Music", "Gaming", "Travel"],
+    actions: [{ type: "DAILY_CHECK_IN", label: "Check in" }, { type: "FEED_COMPANION", label: "Feed" }, { type: "REFLECTION_PROMPT", label: "Reflect" }, { type: "PLAY_MINI_GAME", label: "Guess mood" }]
   },
   {
     id: "STUDY_COACH",
@@ -46,7 +49,8 @@ export const agentTemplates: AgentTemplate[] = [
     expertise: ["learning strategies", "revision planning", "concept explanation"],
     successCriteria: ["Improves study consistency", "Tracks topics and learning preferences"],
     responseStyle: "Clear, motivating, and structured",
-    suggestedInterests: ["Science", "History", "Technology"]
+    suggestedInterests: ["Science", "History", "Technology"],
+    actions: [{ type: "DAILY_CHECK_IN", label: "Plan session" }, { type: "REFLECTION_PROMPT", label: "Review learning" }]
   },
   {
     id: "ANIME_GUIDE",
@@ -58,7 +62,8 @@ export const agentTemplates: AgentTemplate[] = [
     expertise: ["anime genres", "recommendation fit", "watchlist curation"],
     successCriteria: ["Recommendations improve from ratings", "Maintains a useful watch profile"],
     responseStyle: "Playful, spoiler-aware, and concise",
-    suggestedInterests: ["Anime", "Movies", "Music", "Gaming"]
+    suggestedInterests: ["Anime", "Movies", "Music", "Gaming"],
+    actions: [{ type: "DAILY_CHECK_IN", label: "Update watchlist" }, { type: "REFLECTION_PROMPT", label: "Rate a pick" }]
   },
   {
     id: "FITNESS_COACH",
@@ -70,7 +75,8 @@ export const agentTemplates: AgentTemplate[] = [
     expertise: ["habit building", "beginner routines", "fitness planning"],
     successCriteria: ["Builds consistent routines", "Adapts plans from user feedback"],
     responseStyle: "Positive, practical, and accountable",
-    suggestedInterests: ["Fitness", "Music", "Science"]
+    suggestedInterests: ["Fitness", "Music", "Science"],
+    actions: [{ type: "DAILY_CHECK_IN", label: "Log workout" }, { type: "REFLECTION_PROMPT", label: "Review recovery" }]
   },
   {
     id: "CODING_PARTNER",
@@ -82,8 +88,9 @@ export const agentTemplates: AgentTemplate[] = [
     expertise: ["software engineering", "debugging", "technical planning"],
     successCriteria: ["Keeps project context", "Produces actionable technical guidance"],
     responseStyle: "Direct, precise, and collaborative",
-    suggestedInterests: ["Technology", "Science", "Gaming"]
+    suggestedInterests: ["Technology", "Science", "Gaming"],
+    actions: [{ type: "DAILY_CHECK_IN", label: "Set next task" }, { type: "REFLECTION_PROMPT", label: "Record decision" }]
   }
 ];
 
-export const defaultAgentTemplate = agentTemplates[0];
+export const defaultAgentTemplate = agentTemplates.find((template) => template.id === "GENERAL_COMPANION")!;

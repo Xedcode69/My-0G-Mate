@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Activity, Archive, Bot, Brain, CalendarCheck, CircleUserRound, Heart, ImageUp, Loader2, MessageCircle, MessageSquarePlus, Pencil, Plus, Save, Sparkles, ThumbsDown, ThumbsUp, UserRound, Utensils, X } from "lucide-react";
 import { usePrivy } from "@privy-io/react-auth";
 import { companionArchetypes, moodLabels, relationshipLabels } from "@/lib/companion/archetypes";
+import { agentTemplates, defaultAgentTemplate } from "@/lib/companion/agent-templates";
 import { portraitDirections, selectPortraitState, type PortraitActivityState, type PortraitVisualState } from "@/lib/companion/portrait-state";
 import { cn } from "@/lib/ui";
 
@@ -24,6 +25,7 @@ type Companion = {
   generatedPortrait?: string | null;
   portraitPrompt?: string | null;
   portraitVariants?: Partial<Record<PortraitVisualState, string>> | null;
+  agentProfile?: { templateId?: string | null } | null;
   level: number;
   xp: number;
   mood: CompanionMood;
@@ -35,12 +37,12 @@ type Companion = {
   chatLogs: { id: string; userMessage: string; companionResponse: string; createdAt: string }[];
 };
 
-const activities: { type: ActivityType; label: string; icon: typeof Activity }[] = [
-  { type: "DAILY_CHECK_IN", label: "Check in", icon: CalendarCheck },
-  { type: "FEED_COMPANION", label: "Feed", icon: Utensils },
-  { type: "REFLECTION_PROMPT", label: "Reflect", icon: Brain },
-  { type: "PLAY_MINI_GAME", label: "Guess mood", icon: Sparkles }
-];
+const activityIcons: Record<ActivityType, typeof Activity> = {
+  DAILY_CHECK_IN: CalendarCheck,
+  FEED_COMPANION: Utensils,
+  REFLECTION_PROMPT: Brain,
+  PLAY_MINI_GAME: Sparkles
+};
 
 export function CompanionDashboard() {
   const { logout, user } = usePrivy();
@@ -72,6 +74,9 @@ export function CompanionDashboard() {
   const active = companions.find((companion) => companion.id === activeId) ?? companions[0];
   const archetype = active ? companionArchetypes[active.type] : companionArchetypes[type];
   const activeTypeLabel = active?.customTypeName || archetype.label;
+  const agentTemplate = agentTemplates.find((template) => template.id === active?.agentProfile?.templateId) ?? defaultAgentTemplate;
+  const agentActions = agentTemplate.actions;
+  const usesMoodGame = agentActions.some((action) => action.type === "PLAY_MINI_GAME");
   const messages = useMemo(() => [...(active?.chatLogs ?? [])].reverse(), [active?.chatLogs]);
   const latestChat = active?.chatLogs?.[0];
   const recentTopic = conversationTopic(latestChat?.userMessage);
@@ -514,22 +519,23 @@ export function CompanionDashboard() {
           </div>
 
           <div className="rounded-xl bg-white/72 p-4 shadow-[0_8px_28px_rgba(20,21,26,0.05)]">
-            <div className="flex items-center justify-between"><h3 className="font-semibold">Today</h3><span className="text-xs text-black/45">Small moments count</span></div>
+            <div className="flex items-center justify-between"><h3 className="font-semibold">Agent actions</h3><span className="text-xs text-black/45">{agentTemplate.label}</span></div>
             <div className="mt-3 grid grid-cols-2 gap-2">
-              {activities.map(({ type: activityType, label, icon: Icon }) => (
-                <button key={activityType} onClick={() => runActivity(activityType)} disabled={!active || busy} className="flex items-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2.5 text-left text-sm transition-colors hover:bg-paper disabled:opacity-50">
+              {agentActions.map(({ type: activityType, label }) => {
+                const Icon = activityIcons[activityType];
+                return <button key={activityType} onClick={() => runActivity(activityType)} disabled={!active || busy} className="flex items-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2.5 text-left text-sm transition-colors hover:bg-paper disabled:opacity-50">
                   <Icon className="h-4 w-4 shrink-0" />
                   <span>{label}</span>
-                </button>
-              ))}
+                </button>;
+              })}
             </div>
             <details className="mt-3 rounded-lg bg-paper px-3 py-2 text-sm">
-              <summary className="cursor-pointer font-medium text-black/65">Reflection and mood</summary>
-              <select value={moodGuess} onChange={(event) => setMoodGuess(event.target.value as CompanionMood)} className="mt-3 w-full rounded-md border border-black/10 bg-white px-3 py-2 text-sm">
+              <summary className="cursor-pointer font-medium text-black/65">Notes and reflection</summary>
+              {usesMoodGame && <select value={moodGuess} onChange={(event) => setMoodGuess(event.target.value as CompanionMood)} className="mt-3 w-full rounded-md border border-black/10 bg-white px-3 py-2 text-sm">
                 {Object.keys(moodLabels).map((mood) => (
                   <option key={mood} value={mood}>{moodLabels[mood as CompanionMood]}</option>
                 ))}
-              </select>
+              </select>}
               <textarea value={reflection} onChange={(event) => setReflection(event.target.value)} className="mt-2 min-h-20 w-full rounded-md border border-black/10 bg-white px-3 py-2 text-sm" placeholder="Daily reflection" />
             </details>
           </div>

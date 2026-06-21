@@ -14,6 +14,7 @@ const agentProfileSchema = z.object({
   expertise: z.array(z.string().trim().min(2).max(80)).max(12),
   successCriteria: z.array(z.string().trim().min(2).max(160)).max(12),
   responseStyle: z.string().trim().min(2).max(160).optional(),
+  templateId: z.string().trim().min(2).max(80).optional(),
   validationStatus: z.enum(["APPROVED", "NEEDS_REFINEMENT", "BLOCKED"]).optional(),
   validationNotes: z.string().trim().min(2).max(500).optional()
 });
@@ -39,6 +40,7 @@ export async function GET(request: Request) {
       companions: {
         include: {
           personality: true,
+          agentProfile: true,
           memories: { orderBy: { importance: "desc" }, take: 8 },
           chatLogs: { orderBy: { createdAt: "desc" }, take: 20 }
         },
@@ -79,6 +81,7 @@ export async function POST(request: Request) {
           agentProfile: {
             create: body.agentProfile ?? {
               role: defaultAgentTemplate.role,
+              templateId: defaultAgentTemplate.id,
               mission: defaultAgentTemplate.mission,
               scope: defaultAgentTemplate.scope,
               boundaries: defaultAgentTemplate.boundaries,
@@ -116,7 +119,7 @@ export async function POST(request: Request) {
 
       return tx.companion.findUniqueOrThrow({
         where: { id: created.id },
-        include: { personality: true, memories: true, chatLogs: true }
+        include: { personality: true, agentProfile: true, memories: true, chatLogs: true }
       });
     });
 

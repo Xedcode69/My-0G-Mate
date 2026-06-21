@@ -148,6 +148,7 @@ model AgentProfile {
   id              String   @id @default(cuid())
   companionId     String   @unique @map("companion_id")
   role            String
+  templateId      String?  @map("template_id")
   mission         String
   scope           String[]
   boundaries      String[]

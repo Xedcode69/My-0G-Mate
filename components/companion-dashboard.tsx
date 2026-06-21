@@ -230,7 +230,24 @@ export function CompanionDashboard() {
 
   return (
     <main className="min-h-screen px-4 py-6 text-ink sm:px-6 lg:px-8">
-      <div className="fixed right-4 top-4 z-50 sm:right-6 sm:top-6">
+      <header className="mx-auto mb-5 flex max-w-[1440px] flex-wrap items-center justify-between gap-3 rounded-2xl border border-black/10 bg-white/85 px-4 py-3 shadow-sm backdrop-blur sm:px-5">
+        <div className="flex min-w-0 items-center gap-4">
+          <div className="shrink-0">
+            <div className="text-xl font-semibold tracking-tight">MyMate</div>
+            <div className="text-xs text-black/50">Your companion space</div>
+          </div>
+          <div className="hidden h-8 w-px bg-black/10 sm:block" />
+          <label className="min-w-0 sm:w-52">
+            <span className="sr-only">Active companion</span>
+            <select value={active?.id ?? ""} onChange={(event) => setActiveId(event.target.value)} className="w-full truncate rounded-lg border border-black/10 bg-paper px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-ember/20" disabled={companions.length === 0}>
+              {companions.length === 0 ? <option>Choose a companion</option> : companions.map((companion) => <option key={companion.id} value={companion.id}>{companion.name}</option>)}
+            </select>
+          </label>
+        </div>
+        <div className="flex items-center gap-2">
+          {active && <button onClick={() => document.getElementById("companion-chat")?.scrollIntoView({ behavior: "smooth", block: "end" })} className="rounded-lg bg-ink px-3 py-2 text-sm font-medium text-white">Chat with {active.name}</button>}
+          {active && <button onClick={generatePortrait} disabled={portraitBusy} className="rounded-lg border border-black/10 bg-white p-2 text-sm disabled:opacity-50" aria-label="Generate portrait set" title="Portrait set">{portraitBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageUp className="h-4 w-4" />}</button>}
+          {active && <button onClick={createSnapshot} className="rounded-lg border border-black/10 bg-white p-2 text-sm" aria-label="Create snapshot" title="Snapshot"><Archive className="h-4 w-4" /></button>}
         <div className="relative">
           <button onClick={() => setProfileOpen((open) => !open)} className="grid h-11 w-11 place-items-center rounded-full border border-black/10 bg-white text-ink shadow-md transition-transform hover:scale-105" aria-label="Open profile menu" aria-expanded={profileOpen}>
             <CircleUserRound className="h-6 w-6" />
@@ -274,13 +291,14 @@ export function CompanionDashboard() {
             </div>
           )}
         </div>
-      </div>
+        </div>
+      </header>
       <section className="mx-auto grid max-w-[1440px] gap-5 lg:grid-cols-[250px_minmax(0,1fr)_300px]">
         <aside className="h-fit rounded-xl border border-black/10 bg-white/78 p-4 shadow-sm lg:sticky lg:top-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h1 className="text-xl font-semibold">MyMate</h1>
-              <p className="text-sm text-black/60">Persistent AI companions</p>
+              <h2 className="text-base font-semibold">Your companions</h2>
+              <p className="text-xs text-black/55">Choose who to spend time with.</p>
             </div>
           </div>
           <div className="mt-3 truncate rounded-md bg-paper px-3 py-2 text-[11px] text-black/55">{wallet || "Privy account active"}</div>
@@ -323,26 +341,35 @@ export function CompanionDashboard() {
         </aside>
 
         <section className="overflow-hidden rounded-xl border border-black/10 bg-white/82 shadow-sm">
-          <div className="avatar-stage relative min-h-[340px] border-b border-black/10 p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-sm font-medium text-black/55">{activeTypeLabel} / {archetype.background}</div>
-                <h2 className="mt-1 text-3xl font-semibold tracking-tight">{active?.name ?? "Choose a companion"}</h2>
-                <p className="mt-2 max-w-xl text-sm text-black/65">{archetype.evolution}</p>
+          <div className="avatar-stage border-b border-black/10 p-5 sm:p-6">
+            <div className="grid items-center gap-6 md:grid-cols-[minmax(0,1fr)_260px]">
+              <div className="mx-auto grid w-full max-w-[360px] place-items-end md:mx-0">
+                <CompanionPortrait companion={active} accent={archetype.accent} fallbackLabel={active?.avatarKey ?? (active?.evolutionStage === 2 ? archetype.stageTwoAvatar : archetype.stageOneAvatar)} visualState={portraitState} activityState={portraitActivity} />
               </div>
-              {active && (
-                <div className="flex flex-wrap gap-2">
-                  <button onClick={generatePortrait} disabled={portraitBusy} className="rounded-md border border-black/10 bg-white px-3 py-2 text-sm disabled:opacity-50">
-                    {portraitBusy ? <Loader2 className="inline h-4 w-4 animate-spin" /> : <ImageUp className="inline h-4 w-4" />} Portrait set
-                  </button>
-                  <button onClick={createSnapshot} className="rounded-md border border-black/10 bg-white px-3 py-2 text-sm">
-                    <Archive className="inline h-4 w-4" /> Snapshot
-                  </button>
+              <div className="min-w-0">
+                <div className="text-xs font-semibold uppercase tracking-wide text-black/45">{activeTypeLabel}</div>
+                <h2 className="mt-1 truncate text-3xl font-semibold tracking-tight">{active?.name ?? "Choose a companion"}</h2>
+                <p className="mt-2 text-sm leading-6 text-black/60">{archetype.evolution}</p>
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <div className="rounded-xl bg-white/80 p-3 shadow-sm">
+                    <div className="text-xs text-black/45">Mood</div>
+                    <div className="mt-1 text-sm font-semibold">{moodLabels[active?.mood ?? "NEUTRAL"]}</div>
+                  </div>
+                  <div className="rounded-xl bg-white/80 p-3 shadow-sm">
+                    <div className="text-xs text-black/45">Relationship</div>
+                    <div className="mt-1 text-sm font-semibold">{relationshipLabels[active?.relationshipLevel ?? 1]}</div>
+                  </div>
                 </div>
-              )}
-            </div>
-            <div className="mx-auto mt-5 grid min-h-56 max-w-[340px] place-items-end">
-              <CompanionPortrait companion={active} accent={archetype.accent} fallbackLabel={active?.avatarKey ?? (active?.evolutionStage === 2 ? archetype.stageTwoAvatar : archetype.stageOneAvatar)} visualState={portraitState} activityState={portraitActivity} />
+                <div className="mt-3 rounded-xl bg-white/80 p-3 shadow-sm">
+                  <div className="flex items-center justify-between text-xs text-black/50"><span>Level {active?.level ?? 1}</span><span>{active?.xp ?? 0} XP</span></div>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-black/[0.08]"><div className="h-full rounded-full bg-ember transition-all" style={{ width: `${Math.min(100, (active?.xp ?? 0) % 100)}%` }} /></div>
+                  <div className="mt-1.5 text-xs text-black/45">{100 - ((active?.xp ?? 0) % 100)} XP to the next level</div>
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <button onClick={() => runActivity("DAILY_CHECK_IN")} disabled={!active || busy} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-black/10 bg-white px-2 py-2 text-sm font-medium disabled:opacity-50"><CalendarCheck className="h-4 w-4" /> Check in</button>
+                  <button onClick={() => runActivity("REFLECTION_PROMPT")} disabled={!active || busy} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-black/10 bg-white px-2 py-2 text-sm font-medium disabled:opacity-50"><Brain className="h-4 w-4" /> Reflect</button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -366,7 +393,7 @@ export function CompanionDashboard() {
             ))}
           </div>
 
-          <div className="border-t border-black/10 bg-white/90 p-4">
+          <div id="companion-chat" className="border-t border-black/10 bg-white/90 p-4">
             <div className="flex gap-2">
               <input value={message} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void sendMessage(); }} className="min-w-0 flex-1 rounded-md border border-black/10 bg-white px-3 py-2" placeholder="Tell your companion something..." />
               <button onClick={sendMessage} disabled={!active || busy} className="rounded-md bg-mint px-4 py-2 font-medium text-white disabled:opacity-50">

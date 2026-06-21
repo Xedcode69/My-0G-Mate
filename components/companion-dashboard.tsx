@@ -247,9 +247,11 @@ export function CompanionDashboard() {
           </label>
         </div>
         <div className="flex items-center gap-2">
-          {active && <button onClick={() => document.getElementById("companion-chat")?.scrollIntoView({ behavior: "smooth", block: "end" })} className="rounded-lg bg-ink px-3 py-2 text-sm font-medium text-white">Chat with {active.name}</button>}
-          {active && <button onClick={generatePortrait} disabled={portraitBusy} className="rounded-lg border border-black/10 bg-white p-2 text-sm disabled:opacity-50" aria-label="Generate portrait set" title="Portrait set">{portraitBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageUp className="h-4 w-4" />}</button>}
-          {active && <button onClick={createSnapshot} className="rounded-lg border border-black/10 bg-white p-2 text-sm" aria-label="Create snapshot" title="Snapshot"><Archive className="h-4 w-4" /></button>}
+          {active && <button onClick={() => { document.getElementById("companion-chat")?.scrollIntoView({ behavior: "smooth", block: "end" }); window.setTimeout(() => document.getElementById("companion-message")?.focus(), 350); }} className="flex items-center gap-2 rounded-lg bg-ink px-3 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-black"><MessageCircle className="h-4 w-4" /><span>Chat with <span className="hidden sm:inline">{active.name}</span><span className="sm:hidden">companion</span></span></button>}
+          {active && <div className="flex items-center rounded-lg border border-black/10 bg-white p-1 shadow-sm">
+            <button onClick={generatePortrait} disabled={portraitBusy} className="rounded-md p-1.5 text-black/60 transition-colors hover:bg-paper hover:text-ink disabled:opacity-50" aria-label="Generate portrait set" title="Generate portrait set">{portraitBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageUp className="h-4 w-4" />}</button>
+            <button onClick={createSnapshot} className="rounded-md p-1.5 text-black/60 transition-colors hover:bg-paper hover:text-ink" aria-label="Create snapshot" title="Create snapshot"><Archive className="h-4 w-4" /></button>
+          </div>}
         <div className="relative">
           <button onClick={() => setProfileOpen((open) => !open)} className="grid h-11 w-11 place-items-center rounded-full border border-black/10 bg-white text-ink shadow-md transition-transform hover:scale-105" aria-label="Open profile menu" aria-expanded={profileOpen}>
             <CircleUserRound className="h-6 w-6" />
@@ -411,7 +413,7 @@ export function CompanionDashboard() {
 
           <div id="companion-chat" className="border-t border-black/10 bg-white/90 p-4">
             <div className="flex gap-2">
-              <input value={message} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void sendMessage(); }} className="min-w-0 flex-1 rounded-md border border-black/10 bg-white px-3 py-2" placeholder="Tell your companion something..." />
+              <input id="companion-message" value={message} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void sendMessage(); }} className="min-w-0 flex-1 rounded-md border border-black/10 bg-white px-3 py-2" placeholder="Tell your companion something..." />
               <button onClick={sendMessage} disabled={!active || busy} className="rounded-md bg-mint px-4 py-2 font-medium text-white disabled:opacity-50">
                 <MessageCircle className="h-4 w-4" />
               </button>

@@ -6,6 +6,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { Bot, Cat, Check, ImageUp, Loader2, Plus, Sparkles, UserRound } from "lucide-react";
 import { companionArchetypes } from "@/lib/companion/archetypes";
 import { agentTemplates, defaultAgentTemplate } from "@/lib/companion/agent-templates";
+import type { AgentValidation } from "@/lib/companion/agent-validation";
 import { StarterPage } from "@/components/starter-page";
 import { cn } from "@/lib/ui";
 
@@ -69,6 +70,8 @@ export function OnboardingPage() {
   const [agentMission, setAgentMission] = useState(defaultAgentTemplate.mission);
   const [agentScope, setAgentScope] = useState(defaultAgentTemplate.scope.join(", "));
   const [personalContextOpen, setPersonalContextOpen] = useState(true);
+  const [agentValidation, setAgentValidation] = useState<AgentValidation | null>(null);
+  const [validationBusy, setValidationBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const wallet = user?.wallet?.address?.toLowerCase() ?? "";
@@ -76,8 +79,9 @@ export function OnboardingPage() {
   const selectedTypeLabel = type === "CUSTOM" && customTypeName.trim() ? customTypeName.trim() : companionArchetypes[type].label;
   const canCreate = useMemo(() => {
     const interestsReady = agentTemplateId !== defaultAgentTemplate.id || interests.length > 0;
-    return Boolean(name.trim() && interestsReady && agentRole.trim() && agentMission.trim() && agentScope.split(",").some((item) => item.trim()) && (type !== "CUSTOM" || customTypeName.trim()));
-  }, [agentMission, agentRole, agentScope, agentTemplateId, customTypeName, interests.length, name, type]);
+    const customAgentApproved = agentTemplateId !== "CUSTOM_AGENT" || agentValidation?.status === "APPROVED";
+    return Boolean(name.trim() && interestsReady && customAgentApproved && agentRole.trim() && agentMission.trim() && agentScope.split(",").some((item) => item.trim()) && (type !== "CUSTOM" || customTypeName.trim()));
+  }, [agentMission, agentRole, agentScope, agentTemplateId, agentValidation?.status, customTypeName, interests.length, name, type]);
 
   if (!ready) {
     return (
@@ -118,7 +122,9 @@ export function OnboardingPage() {
             boundaries: agentTemplates.find((template) => template.id === agentTemplateId)?.boundaries ?? defaultAgentTemplate.boundaries,
             expertise: agentTemplates.find((template) => template.id === agentTemplateId)?.expertise ?? defaultAgentTemplate.expertise,
             successCriteria: agentTemplates.find((template) => template.id === agentTemplateId)?.successCriteria ?? defaultAgentTemplate.successCriteria,
-            responseStyle: agentTemplates.find((template) => template.id === agentTemplateId)?.responseStyle ?? defaultAgentTemplate.responseStyle
+            responseStyle: agentTemplates.find((template) => template.id === agentTemplateId)?.responseStyle ?? defaultAgentTemplate.responseStyle,
+            validationStatus: agentValidation?.status,
+            validationNotes: agentValidation?.reason
           }
         })
       });
@@ -144,6 +150,41 @@ export function OnboardingPage() {
     setAgentMission(template.mission);
     setAgentScope(template.scope.join(", "));
     setPersonalContextOpen(template.id === defaultAgentTemplate.id);
+    setAgentValidation(null);
+  }
+
+  async function validateAgentDefinition() {
+    setValidationBusy(true);
+    try {
+      const response = await fetch("/api/agent-validation", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-wallet-address": wallet },
+        body: JSON.stringify({
+          role: agentRole,
+          mission: agentMission,
+          scope: agentScope.split(",").map((item) => item.trim()).filter(Boolean),
+          boundaries: selectedAgentTemplate.boundaries,
+          expertise: selectedAgentTemplate.expertise,
+          successCriteria: selectedAgentTemplate.successCriteria,
+          responseStyle: selectedAgentTemplate.responseStyle
+        })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Unable to validate agent");
+      setAgentValidation(data.validation);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Unable to validate agent");
+    } finally {
+      setValidationBusy(false);
+    }
+  }
+
+  function applyValidationSuggestions() {
+    if (!agentValidation) return;
+    setAgentRole(agentValidation.suggestedRole);
+    setAgentMission(agentValidation.suggestedMission);
+    setAgentScope(agentValidation.suggestedScope.join(", "));
+    setAgentValidation(null);
   }
 
   function toggleInterest(interest: string) {
@@ -316,10 +357,20 @@ export function OnboardingPage() {
               ))}
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label className="text-sm font-medium">Role<input value={agentRole} onChange={(event) => setAgentRole(event.target.value)} className="mt-1.5 w-full rounded-md border border-black/10 bg-white px-3 py-2 font-normal" placeholder="e.g. Study coach" /></label>
-              <label className="text-sm font-medium">Scope<input value={agentScope} onChange={(event) => setAgentScope(event.target.value)} className="mt-1.5 w-full rounded-md border border-black/10 bg-white px-3 py-2 font-normal" placeholder="Study plans, revision, explanations" /></label>
+              <label className="text-sm font-medium">Role<input value={agentRole} onChange={(event) => { setAgentRole(event.target.value); setAgentValidation(null); }} className="mt-1.5 w-full rounded-md border border-black/10 bg-white px-3 py-2 font-normal" placeholder="e.g. Study coach" /></label>
+              <label className="text-sm font-medium">Scope<input value={agentScope} onChange={(event) => { setAgentScope(event.target.value); setAgentValidation(null); }} className="mt-1.5 w-full rounded-md border border-black/10 bg-white px-3 py-2 font-normal" placeholder="Study plans, revision, explanations" /></label>
             </div>
-            <label className="mt-3 block text-sm font-medium">Mission<textarea value={agentMission} onChange={(event) => setAgentMission(event.target.value)} className="mt-1.5 min-h-20 w-full rounded-md border border-black/10 bg-white px-3 py-2 font-normal" placeholder="What should this companion help you achieve?" /></label>
+            <label className="mt-3 block text-sm font-medium">Mission<textarea value={agentMission} onChange={(event) => { setAgentMission(event.target.value); setAgentValidation(null); }} className="mt-1.5 min-h-20 w-full rounded-md border border-black/10 bg-white px-3 py-2 font-normal" placeholder="What should this companion help you achieve?" /></label>
+            {agentTemplateId === "CUSTOM_AGENT" && <div className="mt-4 rounded-lg bg-paper p-3">
+              <div className="text-sm font-semibold">Validate custom agent</div>
+              <p className="mt-1 text-xs leading-5 text-black/55">We check that the role, mission, and scope are focused and safe. Creative roles are welcome.</p>
+              <button onClick={validateAgentDefinition} disabled={validationBusy || !agentRole.trim() || !agentMission.trim() || !agentScope.trim()} className="mt-3 inline-flex items-center gap-2 rounded-md bg-ink px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{validationBusy && <Loader2 className="h-4 w-4 animate-spin" />} Validate agent design</button>
+              {agentValidation && <div className={cn("mt-3 rounded-md p-3 text-sm", agentValidation.status === "APPROVED" ? "bg-mint/10 text-mint" : agentValidation.status === "BLOCKED" ? "bg-ember/10 text-ember" : "bg-white text-black/70")}>
+                <div className="font-semibold">{agentValidation.status === "APPROVED" ? "Approved" : agentValidation.status === "BLOCKED" ? "Blocked" : "Needs refinement"}</div>
+                <div className="mt-1">{agentValidation.reason}</div>
+                {agentValidation.status === "NEEDS_REFINEMENT" && <button onClick={applyValidationSuggestions} className="mt-2 rounded-md border border-black/10 bg-white px-2 py-1.5 text-xs font-medium text-ink">Apply suggested role and scope</button>}
+              </div>}
+            </div>}
           </section>
         </div>
       </section>

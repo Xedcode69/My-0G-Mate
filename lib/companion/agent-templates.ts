@@ -13,6 +13,18 @@ export type AgentTemplate = {
 
 export const agentTemplates: AgentTemplate[] = [
   {
+    id: "CUSTOM_AGENT",
+    label: "Custom agent",
+    role: "",
+    mission: "",
+    scope: [],
+    boundaries: ["Be transparent about uncertainty", "Ask before taking external actions"],
+    expertise: [],
+    successCriteria: ["Stays focused on the user's approved mission"],
+    responseStyle: "Clear and helpful",
+    suggestedInterests: []
+  },
+  {
     id: "GENERAL_COMPANION",
     label: "Everyday companion",
     role: "Personal AI companion",

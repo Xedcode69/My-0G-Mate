@@ -13,7 +13,9 @@ const agentProfileSchema = z.object({
   boundaries: z.array(z.string().trim().min(2).max(160)).max(12),
   expertise: z.array(z.string().trim().min(2).max(80)).max(12),
   successCriteria: z.array(z.string().trim().min(2).max(160)).max(12),
-  responseStyle: z.string().trim().min(2).max(160).optional()
+  responseStyle: z.string().trim().min(2).max(160).optional(),
+  validationStatus: z.enum(["APPROVED", "NEEDS_REFINEMENT", "BLOCKED"]).optional(),
+  validationNotes: z.string().trim().min(2).max(500).optional()
 });
 
 const createSchema = z.object({
@@ -82,7 +84,8 @@ export async function POST(request: Request) {
               boundaries: defaultAgentTemplate.boundaries,
               expertise: defaultAgentTemplate.expertise,
               successCriteria: defaultAgentTemplate.successCriteria,
-              responseStyle: defaultAgentTemplate.responseStyle
+              responseStyle: defaultAgentTemplate.responseStyle,
+              validationStatus: "APPROVED"
             }
           }
         }

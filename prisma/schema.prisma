@@ -45,6 +45,12 @@ enum AgentGoalStatus {
   COMPLETE
 }
 
+enum AgentActionRunStatus {
+  ACTIVE
+  COMPLETE
+  CANCELLED
+}
+
 model User {
   id            String      @id @default(cuid())
   walletAddress String      @unique @map("wallet_address")
@@ -81,6 +87,8 @@ model Companion {
   agentMemories     AgentMemory[]
   agentProjects     AgentProject[]
   agentGoals        AgentGoal[]
+  agentActions      AgentActionDefinition[]
+  agentActionRuns   AgentActionRun[]
   personality       PersonalityProfile?
   agentProfile      AgentProfile?
   activityLogs      ActivityLog[]
@@ -89,6 +97,47 @@ model Companion {
 
   @@index([userId])
   @@map("companions")
+}
+
+model AgentActionDefinition {
+  id                   String   @id @default(cuid())
+  companionId          String   @map("companion_id")
+  key                  String
+  label                String
+  description          String
+  starterQuestion      String   @map("starter_question")
+  workflowInstructions String   @map("workflow_instructions")
+  requiredInformation  String[] @default([]) @map("required_information")
+  completionCriteria   String   @map("completion_criteria")
+  safetyConstraints    String[] @default([]) @map("safety_constraints")
+  source               String   @default("TEMPLATE")
+  sortOrder            Int      @default(0) @map("sort_order")
+  enabled              Boolean  @default(true)
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+  companion            Companion @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  runs                 AgentActionRun[]
+
+  @@unique([companionId, key])
+  @@index([companionId, enabled, sortOrder])
+  @@map("agent_action_definitions")
+}
+
+model AgentActionRun {
+  id          String               @id @default(cuid())
+  companionId String               @map("companion_id")
+  actionId    String               @map("action_id")
+  status      AgentActionRunStatus @default(ACTIVE)
+  collectedData Json?              @map("collected_data")
+  result      String?
+  startedAt   DateTime             @default(now()) @map("started_at")
+  completedAt DateTime?            @map("completed_at")
+  companion   Companion            @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  action      AgentActionDefinition @relation(fields: [actionId], references: [id], onDelete: Cascade)
+
+  @@index([companionId, status, startedAt])
+  @@index([actionId, status])
+  @@map("agent_action_runs")
 }
 
 model AgentProject {

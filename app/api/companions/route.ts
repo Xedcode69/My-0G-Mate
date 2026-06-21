@@ -20,6 +20,17 @@ const agentProfileSchema = z.object({
   validationNotes: z.string().trim().min(2).max(500).optional()
 });
 
+const agentActionSchema = z.object({
+  key: z.string().trim().min(2).max(80),
+  label: z.string().trim().min(2).max(80),
+  description: z.string().trim().min(2).max(500),
+  starterQuestion: z.string().trim().min(2).max(500),
+  workflowInstructions: z.string().trim().min(2).max(2000),
+  requiredInformation: z.array(z.string().trim().min(2).max(120)).max(12),
+  completionCriteria: z.string().trim().min(2).max(500),
+  safetyConstraints: z.array(z.string().trim().min(2).max(300)).max(12)
+});
+
 const createSchema = z.object({
   name: z.string().min(2).max(32),
   type: z.nativeEnum(CompanionType),
@@ -28,7 +39,8 @@ const createSchema = z.object({
   avatarImage: z.string().startsWith("data:image/").max(1_000_000).optional(),
   interests: z.array(z.string().min(2).max(40)).max(16).optional(),
   username: z.string().min(2).max(32).optional(),
-  agentProfile: agentProfileSchema.optional()
+  agentProfile: agentProfileSchema.optional(),
+  agentActions: z.array(agentActionSchema).min(1).max(5).optional()
 });
 
 export async function GET(request: Request) {
@@ -95,8 +107,9 @@ export async function POST(request: Request) {
         }
       });
 
+      const actions = body.agentActions ?? workflowDefinitionsForAgent(profile);
       await tx.agentActionDefinition.createMany({
-        data: workflowDefinitionsForAgent(profile).map((action) => ({ ...action, companionId: created.id, source: profile.templateId === "CUSTOM_AGENT" ? "ROLE_INFERENCE" : "TEMPLATE" }))
+        data: actions.map((action, index) => ({ ...action, companionId: created.id, sortOrder: index, source: body.agentActions ? "LLM_VALIDATION" : profile.templateId === "CUSTOM_AGENT" ? "ROLE_INFERENCE" : "TEMPLATE" }))
       });
 
       const interests = [...new Set((body.interests ?? []).map((interest) => interest.trim()).filter(Boolean))];

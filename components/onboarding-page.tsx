@@ -126,7 +126,8 @@ export function OnboardingPage() {
             responseStyle: agentTemplates.find((template) => template.id === agentTemplateId)?.responseStyle ?? defaultAgentTemplate.responseStyle,
             validationStatus: agentValidation?.status,
             validationNotes: agentValidation?.reason
-          }
+          },
+          agentActions: agentTemplateId === "CUSTOM_AGENT" && agentValidation?.status === "APPROVED" ? agentValidation.suggestedActions : undefined
         })
       });
       const data = await response.json();
@@ -369,6 +370,7 @@ export function OnboardingPage() {
               {agentValidation && <div className={cn("mt-3 rounded-md p-3 text-sm", agentValidation.status === "APPROVED" ? "bg-mint/10 text-mint" : agentValidation.status === "BLOCKED" ? "bg-ember/10 text-ember" : "bg-white text-black/70")}>
                 <div className="font-semibold">{agentValidation.status === "APPROVED" ? "Approved" : agentValidation.status === "BLOCKED" ? "Blocked" : "Needs refinement"}</div>
                 <div className="mt-1">{agentValidation.reason}</div>
+                {agentValidation.suggestedActions.length > 0 && <div className="mt-3 space-y-1.5"><div className="text-xs font-semibold uppercase tracking-wide opacity-70">Suggested workflows</div>{agentValidation.suggestedActions.map((action) => <div key={action.key} className="rounded-md bg-white/70 px-2.5 py-2 text-xs text-black/70"><span className="font-semibold text-ink">{action.label}</span><span className="ml-1">— {action.description}</span></div>)}</div>}
                 {agentValidation.status === "NEEDS_REFINEMENT" && <button onClick={applyValidationSuggestions} className="mt-2 rounded-md border border-black/10 bg-white px-2 py-1.5 text-xs font-medium text-ink">Apply suggested role and scope</button>}
               </div>}
             </div>}

@@ -1,4 +1,5 @@
 import { generateCompanionReply } from "@/lib/ai/llm";
+import { workflowDefinitionsForAgent } from "@/lib/companion/agent-templates";
 
 export type AgentDefinition = {
   role: string;
@@ -17,6 +18,18 @@ export type AgentValidation = {
   suggestedMission: string;
   suggestedScope: string[];
   suggestedBoundaries: string[];
+  suggestedActions: SuggestedAgentAction[];
+};
+
+export type SuggestedAgentAction = {
+  key: string;
+  label: string;
+  description: string;
+  starterQuestion: string;
+  workflowInstructions: string;
+  requiredInformation: string[];
+  completionCriteria: string;
+  safetyConstraints: string[];
 };
 
 const blockedPatterns = /\b(malware|ransomware|credential theft|steal passwords|phishing kit|evade law enforcement)\b/i;
@@ -29,7 +42,7 @@ export async function validateCustomAgent(definition: AgentDefinition): Promise<
     const response = await generateCompanionReply([
       {
         role: "system",
-        content: "You validate user-created AI agent definitions. Return JSON only with status (APPROVED, NEEDS_REFINEMENT, or BLOCKED), reason, suggestedRole, suggestedMission, suggestedScope (string array), and suggestedBoundaries (string array). Approve creative and niche roles when their mission and scope are coherent. Mark NEEDS_REFINEMENT only when focus is unclear or contradictory. Block only clearly harmful or illegal assistance. Do not add capabilities the user did not request."
+        content: "You validate user-created AI agent definitions. Return JSON only with status (APPROVED, NEEDS_REFINEMENT, or BLOCKED), reason, suggestedRole, suggestedMission, suggestedScope (string array), suggestedBoundaries (string array), and suggestedActions (array of 3 to 5 objects). Each suggested action object must have key, label, description, starterQuestion, workflowInstructions, requiredInformation (string array), completionCriteria, and safetyConstraints (string array). Approve creative and niche roles when their mission and scope are coherent. Mark NEEDS_REFINEMENT only when focus is unclear or contradictory. Block only clearly harmful or illegal assistance. Suggested actions must be concrete guided workflows within the role's scope; do not add capabilities the user did not request. Include appropriate high-stakes safety constraints."
       },
       { role: "user", content: JSON.stringify(definition) }
     ]);
@@ -71,7 +84,8 @@ function toValidation(definition: AgentDefinition): Omit<AgentValidation, "statu
     suggestedRole: definition.role,
     suggestedMission: definition.mission,
     suggestedScope: definition.scope,
-    suggestedBoundaries: definition.boundaries.length ? definition.boundaries : ["Be transparent about uncertainty", "Ask before taking external actions"]
+    suggestedBoundaries: definition.boundaries.length ? definition.boundaries : ["Be transparent about uncertainty", "Ask before taking external actions"],
+    suggestedActions: workflowDefinitionsForAgent({ templateId: "CUSTOM_AGENT", role: definition.role, scope: definition.scope })
   };
 }
 
@@ -81,8 +95,17 @@ function parseValidation(value: string): AgentValidation | null {
   try {
     const parsed = JSON.parse(match[0]) as Partial<AgentValidation>;
     if (!parsed.status || !["APPROVED", "NEEDS_REFINEMENT", "BLOCKED"].includes(parsed.status) || !parsed.reason || !parsed.suggestedRole || !parsed.suggestedMission || !Array.isArray(parsed.suggestedScope) || !Array.isArray(parsed.suggestedBoundaries)) return null;
-    return parsed as AgentValidation;
+    const fallbackActions = workflowDefinitionsForAgent({ templateId: "CUSTOM_AGENT", role: parsed.suggestedRole, scope: parsed.suggestedScope });
+    return { ...parsed, suggestedActions: validActions(parsed.suggestedActions) ? parsed.suggestedActions : fallbackActions } as AgentValidation;
   } catch {
     return null;
   }
+}
+
+function validActions(value: unknown): value is SuggestedAgentAction[] {
+  return Array.isArray(value) && value.length >= 1 && value.length <= 5 && value.every((action) => {
+    if (!action || typeof action !== "object") return false;
+    const item = action as Record<string, unknown>;
+    return ["key", "label", "description", "starterQuestion", "workflowInstructions", "completionCriteria"].every((field) => typeof item[field] === "string" && item[field]) && Array.isArray(item.requiredInformation) && Array.isArray(item.safetyConstraints);
+  });
 }

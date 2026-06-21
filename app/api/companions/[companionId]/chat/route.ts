@@ -24,6 +24,7 @@ export async function POST(request: Request, context: { params: Promise<{ compan
       where: { id: companionId, user: { walletAddress } },
       include: {
         personality: true,
+        agentProfile: true,
         memories: { orderBy: { importance: "desc" }, take: 30 },
         chatLogs: { orderBy: { createdAt: "desc" }, take: 20 }
       }

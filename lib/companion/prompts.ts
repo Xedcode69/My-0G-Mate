@@ -1,13 +1,14 @@
-import type { AgentProfile, Companion, Memory, PersonalityProfile } from "@prisma/client";
+import type { AgentMemory, AgentProfile, Companion, Memory, PersonalityProfile } from "@prisma/client";
 import { companionArchetypes, relationshipLabels } from "./archetypes";
 
 type PromptCompanion = Companion & {
   personality: PersonalityProfile | null;
   agentProfile: AgentProfile | null;
+  agentMemories: AgentMemory[];
   memories: Memory[];
 };
 
-export function buildSystemPrompt(companion: PromptCompanion) {
+export function buildSystemPrompt(companion: PromptCompanion, relevantAgentMemories = companion.agentMemories) {
   const archetype = companionArchetypes[companion.type];
   const memories = companion.memories
     .sort((a, b) => b.importance - a.importance)
@@ -17,6 +18,9 @@ export function buildSystemPrompt(companion: PromptCompanion) {
 
   const personality = companion.personality;
   const agent = companion.agentProfile;
+  const agentMemories = relevantAgentMemories
+    .map((memory) => `- ${memory.category.toLowerCase()}: ${memory.content}`)
+    .join("\n");
   return [
     `You are a virtual AI companion named ${companion.name}.`,
     `Your companion type is ${companion.customTypeName || archetype.label}. Your traits are ${archetype.traits.join(", ")}.`,
@@ -37,6 +41,7 @@ export function buildSystemPrompt(companion: PromptCompanion) {
     "You remember previous interactions with the user. Use stored memories naturally, only when relevant.",
     "Stay in character. Adapt your communication style gradually based on the user's preferences.",
     "Be warm, engaging, and supportive while remaining an AI companion.",
-    memories ? `Important memories:\n${memories}` : "Important memories: none yet."
+    memories ? `Important companion memories:\n${memories}` : "Important companion memories: none yet.",
+    agentMemories ? `Relevant agent memories for this request:\n${agentMemories}` : "Relevant agent memories: none yet."
   ].filter((line): line is string => Boolean(line)).join("\n");
 }

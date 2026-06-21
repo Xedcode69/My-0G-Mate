@@ -8,6 +8,7 @@ import { jsonError, parseJson, walletFromRequest } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { selectPortraitState } from "@/lib/companion/portrait-state";
+import { retrieveRelevantAgentMemories } from "@/lib/companion/agent-memory";
 
 const schema = z.object({ message: z.string().min(1).max(1200) });
 
@@ -25,6 +26,7 @@ export async function POST(request: Request, context: { params: Promise<{ compan
       include: {
         personality: true,
         agentProfile: true,
+        agentMemories: { orderBy: { importance: "desc" }, take: 100 },
         memories: { orderBy: { importance: "desc" }, take: 30 },
         chatLogs: { orderBy: { createdAt: "desc" }, take: 20 }
       }
@@ -38,8 +40,9 @@ export async function POST(request: Request, context: { params: Promise<{ compan
         { role: "user" as const, content: chat.userMessage },
         { role: "assistant" as const, content: chat.companionResponse }
       ]);
+    const relevantAgentMemories = retrieveRelevantAgentMemories(companion.agentMemories, body.message);
     const response = await generateCompanionReply([
-      { role: "system", content: buildSystemPrompt(companion) },
+      { role: "system", content: buildSystemPrompt(companion, relevantAgentMemories) },
       ...history,
       { role: "user", content: body.message }
     ]);
@@ -53,6 +56,12 @@ export async function POST(request: Request, context: { params: Promise<{ compan
 
     const updated = await prisma.$transaction(async (tx) => {
       await tx.chatLog.create({ data: { companionId, userMessage: body.message, companionResponse: response } });
+      if (relevantAgentMemories.length > 0) {
+        await tx.agentMemory.updateMany({
+          where: { id: { in: relevantAgentMemories.map((memory) => memory.id) } },
+          data: { lastUsedAt: new Date() }
+        });
+      }
       await tx.activityLog.create({ data: { companionId, activityType: "ASK_COMPANION_QUESTION", xpEarned: xpRewards.ASK_COMPANION_QUESTION } });
       for (const candidate of memoryCandidates) {
         const exists = await tx.memory.findFirst({

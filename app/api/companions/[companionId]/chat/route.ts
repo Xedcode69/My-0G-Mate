@@ -27,6 +27,7 @@ export async function POST(request: Request, context: { params: Promise<{ compan
         personality: true,
         agentProfile: true,
         agentMemories: { orderBy: { importance: "desc" }, take: 100 },
+        agentActionRuns: { where: { status: "ACTIVE" }, orderBy: { startedAt: "desc" }, take: 1, include: { action: true } },
         memories: { orderBy: { importance: "desc" }, take: 30 },
         chatLogs: { orderBy: { createdAt: "desc" }, take: 20 }
       }
@@ -41,8 +42,10 @@ export async function POST(request: Request, context: { params: Promise<{ compan
         { role: "assistant" as const, content: chat.companionResponse }
       ]);
     const relevantAgentMemories = retrieveRelevantAgentMemories(companion.agentMemories, body.message);
+    const activeWorkflow = companion.agentActionRuns[0];
     const response = await generateCompanionReply([
       { role: "system", content: buildSystemPrompt(companion, relevantAgentMemories) },
+      ...(activeWorkflow ? [{ role: "system" as const, content: `Active workflow: ${activeWorkflow.action.label}. ${activeWorkflow.action.workflowInstructions} Required information still to clarify: ${activeWorkflow.action.requiredInformation.join(", ")}. Completion criteria: ${activeWorkflow.action.completionCriteria}. Safety constraints: ${activeWorkflow.action.safetyConstraints.join("; ")}. Continue this workflow naturally; do not claim it is complete until the criteria are met.` }] : []),
       ...history,
       { role: "user", content: body.message }
     ]);

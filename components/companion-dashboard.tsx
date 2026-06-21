@@ -2,18 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Activity, Archive, Bot, Brain, CalendarCheck, CircleUserRound, Heart, ImageUp, Loader2, MessageCircle, MessageSquarePlus, Pencil, Plus, Save, Sparkles, ThumbsDown, ThumbsUp, UserRound, Utensils, X } from "lucide-react";
+import { Archive, Bot, Brain, CircleUserRound, Heart, ImageUp, Loader2, MessageCircle, MessageSquarePlus, Pencil, Plus, Save, Sparkles, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import { usePrivy } from "@privy-io/react-auth";
 import { companionArchetypes, moodLabels, relationshipLabels } from "@/lib/companion/archetypes";
-import { actionsForAgent, agentTemplates, defaultAgentTemplate } from "@/lib/companion/agent-templates";
+import { defaultAgentTemplate } from "@/lib/companion/agent-templates";
 import { portraitDirections, selectPortraitState, type PortraitActivityState, type PortraitVisualState } from "@/lib/companion/portrait-state";
 import { cn } from "@/lib/ui";
 
 type CompanionType = "ROBOT" | "PET" | "ANIME_GIRL" | "SPIRIT" | "CUSTOM";
 type CompanionMood = "HAPPY" | "NEUTRAL" | "LONELY" | "EXCITED";
-type ActivityType = "DAILY_CHECK_IN" | "FEED_COMPANION" | "PLAY_MINI_GAME" | "REFLECTION_PROMPT";
 type AgentGoal = { id: string; title: string; status: "ACTIVE" | "PAUSED" | "COMPLETE"; priority: number; progress: number; nextStep?: string | null };
 type AgentInsights = { role: string; mission: string; capabilities: string[]; learned: { id: string; category: string; content: string; importance: number }[]; feedback: { helpful: number; unhelpful: number; corrected: number } };
+type WorkflowAction = { id: string; label: string; description: string; starterQuestion: string };
 
 type Companion = {
   id: string;
@@ -37,13 +37,6 @@ type Companion = {
   chatLogs: { id: string; userMessage: string; companionResponse: string; createdAt: string }[];
 };
 
-const activityIcons: Record<ActivityType, typeof Activity> = {
-  DAILY_CHECK_IN: CalendarCheck,
-  FEED_COMPANION: Utensils,
-  REFLECTION_PROMPT: Brain,
-  PLAY_MINI_GAME: Sparkles
-};
-
 export function CompanionDashboard() {
   const { logout, user } = usePrivy();
   const router = useRouter();
@@ -52,8 +45,6 @@ export function CompanionDashboard() {
   const [name, setName] = useState("Nova");
   const [type, setType] = useState<CompanionType>("ROBOT");
   const [message, setMessage] = useState("");
-  const [reflection, setReflection] = useState("");
-  const [moodGuess, setMoodGuess] = useState<CompanionMood>("HAPPY");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const [portraitBusy, setPortraitBusy] = useState(false);
@@ -69,15 +60,14 @@ export function CompanionDashboard() {
   const [correctionChatId, setCorrectionChatId] = useState("");
   const [correctionNote, setCorrectionNote] = useState("");
   const [agentInsights, setAgentInsights] = useState<AgentInsights | null>(null);
+  const [workflowActions, setWorkflowActions] = useState<WorkflowAction[]>([]);
+  const [workflowBusy, setWorkflowBusy] = useState(false);
   const wallet = user?.wallet?.address?.toLowerCase() ?? "";
 
   const active = companions.find((companion) => companion.id === activeId) ?? companions[0];
   const archetype = active ? companionArchetypes[active.type] : companionArchetypes[type];
   const activeTypeLabel = active?.customTypeName || archetype.label;
-  const agentTemplate = agentTemplates.find((template) => template.id === active?.agentProfile?.templateId) ?? defaultAgentTemplate;
-  const agentActions = actionsForAgent(active?.agentProfile);
-  const agentActionLabel = active?.agentProfile?.role || agentTemplate.label;
-  const usesMoodGame = agentActions.some((action) => action.type === "PLAY_MINI_GAME");
+  const agentActionLabel = active?.agentProfile?.role || defaultAgentTemplate.label;
   const messages = useMemo(() => [...(active?.chatLogs ?? [])].reverse(), [active?.chatLogs]);
   const latestChat = active?.chatLogs?.[0];
   const recentTopic = conversationTopic(latestChat?.userMessage);
@@ -93,9 +83,11 @@ export function CompanionDashboard() {
     if (active?.id && wallet) {
       void loadAgentGoals(active.id);
       void loadAgentInsights(active.id);
+      void loadWorkflowActions(active.id);
     } else {
       setAgentGoals([]);
       setAgentInsights(null);
+      setWorkflowActions([]);
     }
   }, [active?.id, wallet]);
 
@@ -154,6 +146,37 @@ export function CompanionDashboard() {
       setAgentInsights(data.insights ?? null);
     } catch {
       setAgentInsights(null);
+    }
+  }
+
+  async function loadWorkflowActions(companionId: string) {
+    try {
+      const data = await fetch(`/api/companions/${companionId}/actions`, { headers: { "x-wallet-address": wallet } }).then((response) => response.json());
+      setWorkflowActions(data.actions ?? []);
+    } catch {
+      setWorkflowActions([]);
+    }
+  }
+
+  async function startWorkflow(action: WorkflowAction) {
+    if (!active) return;
+    setWorkflowBusy(true);
+    setPortraitActivity("thinking");
+    try {
+      const data = await request<{ companion: Companion; response: string }>(`/api/companions/${active.id}/actions`, {
+        method: "POST",
+        body: JSON.stringify({ actionId: action.id })
+      });
+      replaceCompanion(data.companion);
+      setPortraitActivity("replying");
+      window.setTimeout(() => setPortraitActivity("idle"), 1200);
+      setStatus(`${action.label} started`);
+      window.setTimeout(() => document.getElementById("companion-chat")?.scrollIntoView({ behavior: "smooth", block: "end" }), 50);
+    } catch (error) {
+      setPortraitActivity("idle");
+      setStatus(error instanceof Error ? error.message : "Unable to start workflow");
+    } finally {
+      setWorkflowBusy(false);
     }
   }
 
@@ -232,27 +255,6 @@ export function CompanionDashboard() {
     } catch (error) {
       setPortraitActivity("idle");
       setStatus(error instanceof Error ? error.message : "Chat failed");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function runActivity(activityType: ActivityType) {
-    if (!active) return;
-    setBusy(true);
-    setPortraitActivity(activityType === "PLAY_MINI_GAME" ? "celebrating" : "thinking");
-    try {
-      const data = await request<{ companion: Companion; xpEarned: number; guessedCorrectly?: boolean }>(`/api/companions/${active.id}/activities`, {
-        method: "POST",
-        body: JSON.stringify({ activityType, moodGuess, reflection })
-      });
-      replaceCompanion(data.companion);
-      setReflection("");
-      setStatus(`+${data.xpEarned} XP`);
-      window.setTimeout(() => setPortraitActivity("idle"), 1200);
-    } catch (error) {
-      setPortraitActivity("idle");
-      setStatus(error instanceof Error ? error.message : "Activity failed");
     } finally {
       setBusy(false);
     }
@@ -438,10 +440,9 @@ export function CompanionDashboard() {
                   <div className="mt-2 h-2 overflow-hidden rounded-full bg-black/[0.08]"><div className="h-full rounded-full bg-ember transition-all" style={{ width: `${Math.min(100, (active?.xp ?? 0) % 100)}%` }} /></div>
                   <div className="mt-1.5 text-xs text-black/45">{100 - ((active?.xp ?? 0) % 100)} XP to the next level</div>
                 </div>
-                <div className="mt-2 flex gap-2">
-                  <button onClick={() => runActivity("DAILY_CHECK_IN")} disabled={!active || busy} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-black/10 bg-white px-2 py-2 text-sm font-medium disabled:opacity-50"><CalendarCheck className="h-4 w-4" /> Check in</button>
-                  <button onClick={() => runActivity("REFLECTION_PROMPT")} disabled={!active || busy} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-black/10 bg-white px-2 py-2 text-sm font-medium disabled:opacity-50"><Brain className="h-4 w-4" /> Reflect</button>
-                </div>
+                {workflowActions.length > 0 && <div className="mt-2 flex gap-2">
+                  {workflowActions.slice(0, 2).map((action) => <button key={action.id} onClick={() => void startWorkflow(action)} disabled={!active || workflowBusy} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-black/10 bg-white px-2 py-2 text-sm font-medium disabled:opacity-50"><Sparkles className="h-4 w-4" /> {action.label}</button>)}
+                </div>}
               </div>
             </div>
           </div>
@@ -522,23 +523,12 @@ export function CompanionDashboard() {
           <div className="rounded-xl bg-white/72 p-4 shadow-[0_8px_28px_rgba(20,21,26,0.05)]">
             <div className="flex items-center justify-between"><h3 className="font-semibold">Agent actions</h3><span className="text-xs text-black/45">{agentActionLabel}</span></div>
             <div className="mt-3 grid grid-cols-2 gap-2">
-              {agentActions.map(({ type: activityType, label }) => {
-                const Icon = activityIcons[activityType];
-                return <button key={activityType} onClick={() => runActivity(activityType)} disabled={!active || busy} className="flex items-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2.5 text-left text-sm transition-colors hover:bg-paper disabled:opacity-50">
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span>{label}</span>
-                </button>;
-              })}
+              {workflowActions.map((action) => <button key={action.id} onClick={() => void startWorkflow(action)} disabled={!active || workflowBusy} className="rounded-lg border border-black/10 bg-white p-3 text-left text-sm transition-colors hover:bg-paper disabled:opacity-50">
+                <div className="flex items-center gap-2 font-medium"><Sparkles className="h-4 w-4 shrink-0 text-ember" /> {action.label}</div>
+                <div className="mt-1 text-xs leading-4 text-black/50">{action.description}</div>
+              </button>)}
             </div>
-            <details className="mt-3 rounded-lg bg-paper px-3 py-2 text-sm">
-              <summary className="cursor-pointer font-medium text-black/65">Notes and reflection</summary>
-              {usesMoodGame && <select value={moodGuess} onChange={(event) => setMoodGuess(event.target.value as CompanionMood)} className="mt-3 w-full rounded-md border border-black/10 bg-white px-3 py-2 text-sm">
-                {Object.keys(moodLabels).map((mood) => (
-                  <option key={mood} value={mood}>{moodLabels[mood as CompanionMood]}</option>
-                ))}
-              </select>}
-              <textarea value={reflection} onChange={(event) => setReflection(event.target.value)} className="mt-2 min-h-20 w-full rounded-md border border-black/10 bg-white px-3 py-2 text-sm" placeholder="Daily reflection" />
-            </details>
+            {workflowActions.length === 0 && <p className="mt-3 text-sm text-black/50">Loading workflows…</p>}
           </div>
 
           <div className="rounded-xl bg-white/72 p-4 shadow-[0_8px_28px_rgba(20,21,26,0.05)]">

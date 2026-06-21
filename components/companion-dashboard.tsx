@@ -293,15 +293,15 @@ export function CompanionDashboard() {
         </div>
         </div>
       </header>
-      <section className="mx-auto grid max-w-[1440px] gap-5 lg:grid-cols-[250px_minmax(0,1fr)_300px]">
-        <aside className="h-fit rounded-xl border border-black/10 bg-white/78 p-4 shadow-sm lg:sticky lg:top-5">
+      <section className="mx-auto grid max-w-[1440px] gap-5 lg:grid-cols-[220px_minmax(0,1fr)_300px]">
+        <aside className="h-fit self-start rounded-xl border border-black/10 bg-white/78 p-3 shadow-sm lg:sticky lg:top-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-base font-semibold">Your companions</h2>
-              <p className="text-xs text-black/55">Choose who to spend time with.</p>
+              <h2 className="text-base font-semibold">Companions</h2>
+              <p className="text-xs text-black/55">Your shared space</p>
             </div>
+            <span className="rounded-full bg-paper px-2 py-1 text-xs font-medium text-black/55">{companions.length}</span>
           </div>
-          <div className="mt-3 truncate rounded-md bg-paper px-3 py-2 text-[11px] text-black/55">{wallet || "Privy account active"}</div>
 
           {(companions.length === 0 || showCompanionForm) && <div className="mt-5 space-y-3 rounded-lg border border-black/10 bg-white/60 p-3">
             <div className="flex items-center justify-between gap-2">
@@ -322,18 +322,16 @@ export function CompanionDashboard() {
             </button>
           </div>}
 
-          <div className="mt-5 border-t border-black/10 pt-4">
-            <div className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-black/45">
-              <span>Companions</span>
-              <span>{companions.length}</span>
-            </div>
-            <div className="space-y-2">
+          <div className="mt-4">
+            <div className="space-y-1.5">
             {companions.map((companion) => (
-              <button key={companion.id} onClick={() => setActiveId(companion.id)} className={cn("w-full rounded-lg border p-3 text-left transition-colors", active?.id === companion.id ? "border-ink/30 bg-paper shadow-sm" : "border-black/10 bg-white/60 hover:bg-white")}>
-                <div className="font-medium">{companion.name}</div>
-                <div className="text-xs text-black/55">
-                  L{companion.level} / {relationshipLabels[companion.relationshipLevel]} / {moodLabels[companion.mood]}
+              <button key={companion.id} onClick={() => setActiveId(companion.id)} className={cn("flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors", active?.id === companion.id ? "bg-paper shadow-sm" : "hover:bg-white")}>
+                <MessageAvatar label={companion.name} image={companion.generatedPortrait || companion.avatarImage} kind="companion" />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold">{companion.name}</div>
+                  <div className="truncate text-xs text-black/50">L{companion.level} · {moodLabels[companion.mood]}</div>
                 </div>
+                {active?.id === companion.id && <span className="h-2 w-2 shrink-0 rounded-full bg-mint" aria-label="Active companion" />}
               </button>
             ))}
             </div>

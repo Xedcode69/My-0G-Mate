@@ -373,7 +373,16 @@ export function CompanionDashboard() {
             </div>
           </div>
 
-          <div className="h-[280px] space-y-3 overflow-y-auto p-5 lg:h-[300px]">
+          <div className="bg-paper/45 p-4 sm:p-5">
+            <section className="overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm">
+              <div className="flex items-center justify-between border-b border-black/10 px-4 py-3">
+                <div>
+                  <h3 className="text-sm font-semibold">Conversation</h3>
+                  <p className="text-xs text-black/50">Chatting with {active?.name ?? "your companion"}</p>
+                </div>
+                <div className="rounded-full bg-paper px-2.5 py-1 text-xs font-medium text-black/55 capitalize">{portraitActivity}</div>
+              </div>
+          <div className="h-[240px] space-y-3 overflow-y-auto p-4 sm:p-5 lg:h-[260px]">
             {messages.length === 0 && <p className="text-sm text-black/55">Start a conversation. Your companion will save meaningful memories as you talk.</p>}
             {messages.map((chat) => (
               <div key={chat.id} className="space-y-2">
@@ -401,6 +410,8 @@ export function CompanionDashboard() {
               </button>
             </div>
             {status && <div className="mt-2 text-sm text-black/60">{status}</div>}
+          </div>
+            </section>
           </div>
         </section>
 

@@ -64,12 +64,31 @@ model Companion {
   user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   memories          Memory[]
   personality       PersonalityProfile?
+  agentProfile      AgentProfile?
   activityLogs      ActivityLog[]
   chatLogs          ChatLog[]
   memorySnapshots   MemorySnapshot[]
 
   @@index([userId])
   @@map("companions")
+}
+
+model AgentProfile {
+  id              String   @id @default(cuid())
+  companionId     String   @unique @map("companion_id")
+  role            String
+  mission         String
+  scope           String[]
+  boundaries      String[]
+  expertise       String[]
+  successCriteria String[] @map("success_criteria")
+  responseStyle   String?  @map("response_style")
+  autonomyLevel   String   @default("ADVISOR") @map("autonomy_level")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  companion       Companion @relation(fields: [companionId], references: [id], onDelete: Cascade)
+
+  @@map("agent_profiles")
 }
 
 model Memory {

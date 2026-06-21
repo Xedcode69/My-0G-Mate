@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Activity, Archive, Bot, Brain, CalendarCheck, CircleUserRound, Heart, ImageUp, Loader2, MessageCircle, Pencil, Plus, Save, Sparkles, UserRound, Utensils, X } from "lucide-react";
+import { Activity, Archive, Bot, Brain, CalendarCheck, CircleUserRound, Heart, ImageUp, Loader2, MessageCircle, MessageSquarePlus, Pencil, Plus, Save, Sparkles, ThumbsDown, ThumbsUp, UserRound, Utensils, X } from "lucide-react";
 import { usePrivy } from "@privy-io/react-auth";
 import { companionArchetypes, moodLabels, relationshipLabels } from "@/lib/companion/archetypes";
 import { portraitDirections, selectPortraitState, type PortraitActivityState, type PortraitVisualState } from "@/lib/companion/portrait-state";
@@ -62,6 +62,9 @@ export function CompanionDashboard() {
   const [profileName, setProfileName] = useState("");
   const [profileBusy, setProfileBusy] = useState(false);
   const [agentGoals, setAgentGoals] = useState<AgentGoal[]>([]);
+  const [feedbackByChat, setFeedbackByChat] = useState<Record<string, "HELPFUL" | "UNHELPFUL" | "CORRECTED">>({});
+  const [correctionChatId, setCorrectionChatId] = useState("");
+  const [correctionNote, setCorrectionNote] = useState("");
   const wallet = user?.wallet?.address?.toLowerCase() ?? "";
 
   const active = companions.find((companion) => companion.id === activeId) ?? companions[0];
@@ -149,6 +152,22 @@ export function CompanionDashboard() {
       setStatus(error instanceof Error ? error.message : "Unable to save profile");
     } finally {
       setProfileBusy(false);
+    }
+  }
+
+  async function sendFeedback(chatId: string, rating: "HELPFUL" | "UNHELPFUL" | "CORRECTED", note?: string) {
+    if (!active) return;
+    try {
+      await request(`/api/companions/${active.id}/feedback`, {
+        method: "POST",
+        body: JSON.stringify({ chatId, rating, note })
+      });
+      setFeedbackByChat((current) => ({ ...current, [chatId]: rating }));
+      setCorrectionChatId("");
+      setCorrectionNote("");
+      setStatus(rating === "HELPFUL" ? "Feedback saved — this was helpful" : "Feedback saved — your companion will adapt");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Unable to save feedback");
     }
   }
 
@@ -428,6 +447,20 @@ export function CompanionDashboard() {
                   <MessageAvatar label={active?.name ?? "Companion"} image={active?.generatedPortrait || active?.avatarImage} kind="companion" />
                   <div className="chat-bubble chat-bubble--companion max-w-[78%] rounded-lg bg-paper px-3 py-2 text-sm">
                     {chat.companionResponse}
+                    {feedbackByChat[chat.id] ? (
+                      <div className="mt-2 text-xs text-black/45">Feedback: {feedbackByChat[chat.id].toLowerCase()}</div>
+                    ) : correctionChatId === chat.id ? (
+                      <div className="mt-3 flex gap-2">
+                        <input value={correctionNote} onChange={(event) => setCorrectionNote(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && correctionNote.trim().length >= 2) void sendFeedback(chat.id, "CORRECTED", correctionNote.trim()); }} className="min-w-0 flex-1 rounded-md border border-black/10 bg-white px-2 py-1.5 text-xs" placeholder="What should be corrected?" autoFocus />
+                        <button onClick={() => void sendFeedback(chat.id, "CORRECTED", correctionNote.trim())} disabled={correctionNote.trim().length < 2} className="rounded-md bg-ink px-2 text-xs text-white disabled:opacity-50">Save</button>
+                      </div>
+                    ) : (
+                      <div className="mt-2 flex items-center gap-1">
+                        <button onClick={() => void sendFeedback(chat.id, "HELPFUL")} className="rounded p-1 text-black/40 transition-colors hover:bg-white hover:text-mint" title="Helpful" aria-label="Mark response helpful"><ThumbsUp className="h-3.5 w-3.5" /></button>
+                        <button onClick={() => void sendFeedback(chat.id, "UNHELPFUL")} className="rounded p-1 text-black/40 transition-colors hover:bg-white hover:text-ember" title="Not helpful" aria-label="Mark response unhelpful"><ThumbsDown className="h-3.5 w-3.5" /></button>
+                        <button onClick={() => setCorrectionChatId(chat.id)} className="rounded p-1 text-black/40 transition-colors hover:bg-white hover:text-ink" title="Correct response" aria-label="Correct response"><MessageSquarePlus className="h-3.5 w-3.5" /></button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

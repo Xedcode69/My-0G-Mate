@@ -232,7 +232,7 @@ export function CompanionDashboard() {
 
   return (
     <main className="min-h-screen px-4 py-6 text-ink sm:px-6 lg:px-8">
-      <header className="mx-auto mb-5 flex max-w-[1440px] flex-wrap items-center justify-between gap-3 rounded-2xl border border-black/10 bg-white/85 px-4 py-3 shadow-sm backdrop-blur sm:px-5">
+      <header className="mx-auto mb-5 flex max-w-[1440px] flex-wrap items-center justify-between gap-3 rounded-2xl bg-white/80 px-4 py-3 shadow-[0_8px_28px_rgba(20,21,26,0.06)] backdrop-blur sm:px-5">
         <div className="flex min-w-0 items-center gap-4">
           <div className="shrink-0">
             <div className="text-xl font-semibold tracking-tight">MyMate</div>
@@ -298,7 +298,7 @@ export function CompanionDashboard() {
         </div>
       </header>
       <section className="mx-auto grid max-w-[1440px] gap-5 lg:grid-cols-[220px_minmax(0,1fr)_300px]">
-        <aside className="h-fit self-start rounded-xl border border-black/10 bg-white/78 p-3 shadow-sm lg:sticky lg:top-5">
+        <aside className="h-fit self-start rounded-xl bg-white/72 p-3 shadow-[0_8px_28px_rgba(20,21,26,0.05)] lg:sticky lg:top-5">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold">Companions</h2>
@@ -342,7 +342,7 @@ export function CompanionDashboard() {
           </div>
         </aside>
 
-        <section className="overflow-hidden rounded-xl border border-black/10 bg-white/82 shadow-sm">
+        <section className="overflow-hidden rounded-xl bg-white/82 shadow-[0_10px_32px_rgba(20,21,26,0.06)]">
           <div className="avatar-stage border-b border-black/10 p-5 sm:p-6">
             <div className="grid items-start gap-5 md:grid-cols-[minmax(0,1.2fr)_300px] md:gap-7">
               <div className="mx-auto grid w-full max-w-[430px] place-items-end md:mx-0">
@@ -352,7 +352,7 @@ export function CompanionDashboard() {
                 <div className="text-xs font-semibold uppercase tracking-wide text-black/45">{activeTypeLabel}</div>
                 <h2 className="mt-1 truncate text-3xl font-semibold tracking-tight">{active?.name ?? "Choose a companion"}</h2>
                 <p className="mt-2 text-sm leading-6 text-black/60">{archetype.evolution}</p>
-                <div className="mt-3 rounded-xl border border-white/80 bg-white/65 p-3">
+                <div className="mt-3 rounded-xl bg-white/65 p-3 shadow-sm">
                   <div className="text-[11px] font-semibold uppercase tracking-wide text-black/45">Right now</div>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-black/65"><Sparkles className="h-3.5 w-3.5 text-ember" /> Feeling {portraitDirections[portraitState].label.toLowerCase()}</span>
@@ -383,7 +383,7 @@ export function CompanionDashboard() {
           </div>
 
           <div className="bg-paper/45 p-4 sm:p-5">
-            <section className="overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm">
+            <section className="overflow-hidden rounded-xl bg-white/90 shadow-[0_6px_20px_rgba(20,21,26,0.05)]">
               <div className="flex items-center justify-between border-b border-black/10 px-4 py-3">
                 <div>
                   <h3 className="text-sm font-semibold">Conversation</h3>
@@ -425,7 +425,7 @@ export function CompanionDashboard() {
         </section>
 
         <aside className="space-y-4 lg:sticky lg:top-5 lg:h-fit">
-          <div className="rounded-xl border border-black/10 bg-white/78 p-4 shadow-sm">
+          <div className="rounded-xl bg-white/72 p-4 shadow-[0_8px_28px_rgba(20,21,26,0.05)]">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold">Growth</h3>
               <span className="rounded-full bg-paper px-2 py-1 text-xs font-medium">Level {active?.level ?? 1}</span>
@@ -441,7 +441,7 @@ export function CompanionDashboard() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-black/10 bg-white/78 p-4 shadow-sm">
+          <div className="rounded-xl bg-white/72 p-4 shadow-[0_8px_28px_rgba(20,21,26,0.05)]">
             <div className="flex items-center justify-between"><h3 className="font-semibold">Today</h3><span className="text-xs text-black/45">Small moments count</span></div>
             <div className="mt-3 grid grid-cols-2 gap-2">
               {activities.map(({ type: activityType, label, icon: Icon }) => (
@@ -462,7 +462,7 @@ export function CompanionDashboard() {
             </details>
           </div>
 
-          <div className="rounded-xl border border-black/10 bg-white/78 p-4 shadow-sm">
+          <div className="rounded-xl bg-white/72 p-4 shadow-[0_8px_28px_rgba(20,21,26,0.05)]">
             <div className="flex items-center justify-between"><h3 className="flex items-center gap-2 font-semibold"><Heart className="h-4 w-4" /> Recent memories</h3><span className="text-xs text-black/45">{active?.memories.length ?? 0}</span></div>
             <div className="mt-3 space-y-2">
               {(active?.memories ?? []).length === 0 && <p className="text-sm text-black/55">No long-term memories yet.</p>}

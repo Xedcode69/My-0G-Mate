@@ -33,7 +33,8 @@ select {
 .avatar-stage {
   background:
     linear-gradient(160deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.68)),
-    repeating-linear-gradient(90deg, rgba(20, 21, 26, 0.05) 0 1px, transparent 1px 28px);
+    radial-gradient(circle at 15% 20%, rgba(212, 95, 60, 0.10), transparent 34%),
+    radial-gradient(circle at 85% 80%, rgba(47, 155, 123, 0.09), transparent 30%);
 }
 
 .chat-bubble {

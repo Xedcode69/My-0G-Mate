@@ -417,40 +417,49 @@ export function CompanionDashboard() {
 
         <aside className="space-y-4 lg:sticky lg:top-5 lg:h-fit">
           <div className="rounded-xl border border-black/10 bg-white/78 p-4 shadow-sm">
-            <h3 className="font-semibold">Growth</h3>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-              <Metric label="Level" value={active?.level ?? 1} />
-              <Metric label="XP" value={active?.xp ?? 0} />
-              <Metric label="Trust" value={active?.trustScore ?? 0} />
-              <Metric label="Stage" value={active?.evolutionStage ?? 1} />
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">Growth</h3>
+              <span className="rounded-full bg-paper px-2 py-1 text-xs font-medium">Level {active?.level ?? 1}</span>
+            </div>
+            <div className="mt-4 flex items-end justify-between">
+              <div><div className="text-2xl font-semibold">{active?.xp ?? 0}</div><div className="text-xs text-black/50">Total XP</div></div>
+              <div className="text-right"><div className="text-sm font-semibold">{100 - ((active?.xp ?? 0) % 100)} XP</div><div className="text-xs text-black/50">to next level</div></div>
+            </div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-black/[0.08]"><div className="h-full rounded-full bg-ember" style={{ width: `${Math.min(100, (active?.xp ?? 0) % 100)}%` }} /></div>
+            <div className="mt-4 grid grid-cols-2 gap-2 border-t border-black/10 pt-3 text-sm">
+              <div><div className="text-xs text-black/45">Trust</div><div className="mt-1 font-semibold">{active?.trustScore ?? 0}</div></div>
+              <div><div className="text-xs text-black/45">Evolution</div><div className="mt-1 font-semibold">Stage {active?.evolutionStage ?? 1}</div></div>
             </div>
           </div>
 
           <div className="rounded-xl border border-black/10 bg-white/78 p-4 shadow-sm">
-            <h3 className="font-semibold">Activities</h3>
+            <div className="flex items-center justify-between"><h3 className="font-semibold">Today</h3><span className="text-xs text-black/45">Small moments count</span></div>
             <div className="mt-3 grid grid-cols-2 gap-2">
               {activities.map(({ type: activityType, label, icon: Icon }) => (
-                <button key={activityType} onClick={() => runActivity(activityType)} disabled={!active || busy} className="rounded-md border border-black/10 bg-white p-3 text-sm disabled:opacity-50">
-                  <Icon className="mb-2 h-4 w-4" />
-                  {label}
+                <button key={activityType} onClick={() => runActivity(activityType)} disabled={!active || busy} className="flex items-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2.5 text-left text-sm transition-colors hover:bg-paper disabled:opacity-50">
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span>{label}</span>
                 </button>
               ))}
             </div>
-            <select value={moodGuess} onChange={(event) => setMoodGuess(event.target.value as CompanionMood)} className="mt-3 w-full rounded-md border border-black/10 bg-white px-3 py-2 text-sm">
-              {Object.keys(moodLabels).map((mood) => (
-                <option key={mood} value={mood}>{moodLabels[mood as CompanionMood]}</option>
-              ))}
-            </select>
-            <textarea value={reflection} onChange={(event) => setReflection(event.target.value)} className="mt-3 min-h-20 w-full rounded-md border border-black/10 bg-white px-3 py-2 text-sm" placeholder="Daily reflection" />
+            <details className="mt-3 rounded-lg bg-paper px-3 py-2 text-sm">
+              <summary className="cursor-pointer font-medium text-black/65">Reflection and mood</summary>
+              <select value={moodGuess} onChange={(event) => setMoodGuess(event.target.value as CompanionMood)} className="mt-3 w-full rounded-md border border-black/10 bg-white px-3 py-2 text-sm">
+                {Object.keys(moodLabels).map((mood) => (
+                  <option key={mood} value={mood}>{moodLabels[mood as CompanionMood]}</option>
+                ))}
+              </select>
+              <textarea value={reflection} onChange={(event) => setReflection(event.target.value)} className="mt-2 min-h-20 w-full rounded-md border border-black/10 bg-white px-3 py-2 text-sm" placeholder="Daily reflection" />
+            </details>
           </div>
 
           <div className="rounded-xl border border-black/10 bg-white/78 p-4 shadow-sm">
-            <h3 className="flex items-center gap-2 font-semibold"><Heart className="h-4 w-4" /> Memories</h3>
+            <div className="flex items-center justify-between"><h3 className="flex items-center gap-2 font-semibold"><Heart className="h-4 w-4" /> Recent memories</h3><span className="text-xs text-black/45">{active?.memories.length ?? 0}</span></div>
             <div className="mt-3 space-y-2">
               {(active?.memories ?? []).length === 0 && <p className="text-sm text-black/55">No long-term memories yet.</p>}
-              {(active?.memories ?? []).map((memory) => (
-                <div key={memory.id} className="rounded-md bg-paper p-2 text-sm">
-                  <div className="text-xs uppercase text-black/45">{memory.memoryType} / {memory.importance}</div>
+              {(active?.memories ?? []).slice(0, 3).map((memory) => (
+                <div key={memory.id} className="rounded-lg bg-paper p-2.5 text-sm">
+                  <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-black/45">{memory.memoryType}</div>
                   {memory.content}
                 </div>
               ))}
@@ -459,15 +468,6 @@ export function CompanionDashboard() {
         </aside>
       </section>
     </main>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className="rounded-md bg-paper p-3">
-      <div className="text-xs text-black/50">{label}</div>
-      <div className="text-xl font-semibold">{value}</div>
-    </div>
   );
 }
 

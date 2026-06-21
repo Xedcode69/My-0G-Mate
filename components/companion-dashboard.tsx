@@ -229,53 +229,61 @@ export function CompanionDashboard() {
   }
 
   return (
-    <main className="min-h-screen px-4 py-5 text-ink sm:px-6 lg:px-8">
-      <section className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[320px_minmax(0,1fr)_320px]">
-        <aside className="rounded-lg border border-black/10 bg-white/78 p-4 shadow-sm">
+    <main className="min-h-screen px-4 py-6 text-ink sm:px-6 lg:px-8">
+      <div className="fixed right-4 top-4 z-50 sm:right-6 sm:top-6">
+        <div className="relative">
+          <button onClick={() => setProfileOpen((open) => !open)} className="grid h-11 w-11 place-items-center rounded-full border border-black/10 bg-white text-ink shadow-md transition-transform hover:scale-105" aria-label="Open profile menu" aria-expanded={profileOpen}>
+            <CircleUserRound className="h-6 w-6" />
+          </button>
+          {profileOpen && (
+            <div className="absolute right-0 top-14 w-80 overflow-hidden rounded-2xl border border-black/10 bg-white shadow-xl">
+              <div className="bg-paper px-4 py-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-ink text-base font-semibold text-white">
+                      {(profileName || "Y").slice(0, 1).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="truncate font-semibold">{profileName || "Your profile"}</div>
+                      <div className="text-xs text-black/50">MyMate account</div>
+                    </div>
+                  </div>
+                  <button onClick={() => setProfileOpen(false)} className="rounded-md p-1.5 text-black/45 hover:bg-white" aria-label="Close profile menu"><X className="h-4 w-4" /></button>
+                </div>
+              </div>
+              <div className="space-y-4 p-4">
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-black/45">Display name</label>
+                    {!profileEditing && <button onClick={() => setProfileEditing(true)} className="flex items-center gap-1 text-xs font-medium text-ink hover:text-ember"><Pencil className="h-3.5 w-3.5" /> Edit</button>}
+                  </div>
+                  {profileEditing ? (
+                    <input value={profileName} onChange={(event) => setProfileName(event.target.value)} className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none ring-ember/20 focus:ring-2" placeholder="Your name" autoFocus />
+                  ) : (
+                    <div className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm">{profileName || "Add your name"}</div>
+                  )}
+                </div>
+                <div>
+                  <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-black/45">Wallet</div>
+                  <div className="truncate rounded-lg border border-black/10 bg-white px-3 py-2 font-mono text-xs text-black/60">{wallet}</div>
+                </div>
+                {profileEditing && <button onClick={saveProfile} disabled={profileBusy} className="flex w-full items-center justify-center gap-2 rounded-lg bg-ink px-3 py-2.5 text-sm font-medium text-white disabled:opacity-50"><Save className="h-4 w-4" /> Save changes</button>}
+                <button onClick={() => { setShowCompanionForm(true); setProfileOpen(false); }} className="flex w-full items-center justify-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2.5 text-sm font-medium hover:bg-paper"><Plus className="h-4 w-4" /> Add companion</button>
+                <button onClick={logout} className="w-full rounded-lg px-3 py-2 text-sm text-black/55 hover:bg-paper hover:text-ink">Log out</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      <section className="mx-auto grid max-w-[1440px] gap-5 lg:grid-cols-[250px_minmax(0,1fr)_300px]">
+        <aside className="h-fit rounded-xl border border-black/10 bg-white/78 p-4 shadow-sm lg:sticky lg:top-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-semibold">MyMate</h1>
+              <h1 className="text-xl font-semibold">MyMate</h1>
               <p className="text-sm text-black/60">Persistent AI companions</p>
             </div>
-            <div className="relative">
-              <button onClick={() => setProfileOpen((open) => !open)} className="rounded-full border border-black/10 bg-white p-2 text-ink shadow-sm" aria-label="Open profile menu">
-                <CircleUserRound className="h-5 w-5" />
-              </button>
-              {profileOpen && (
-                <div className="absolute right-0 top-11 z-30 w-72 rounded-lg border border-black/10 bg-white p-3 shadow-lg">
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <div className="text-sm font-semibold">Your profile</div>
-                      <div className="text-xs text-black/50">Personalize your space</div>
-                    </div>
-                    <button onClick={() => setProfileOpen(false)} className="rounded p-1 text-black/50 hover:bg-paper" aria-label="Close profile menu"><X className="h-4 w-4" /></button>
-                  </div>
-                  <div className="mt-3">
-                    <label className="text-xs font-medium text-black/55">Display name</label>
-                    {profileEditing ? (
-                      <input value={profileName} onChange={(event) => setProfileName(event.target.value)} className="mt-1 w-full rounded-md border border-black/10 px-2 py-2 text-sm" placeholder="Your name" autoFocus />
-                    ) : (
-                      <div className="mt-1 rounded-md bg-paper px-2 py-2 text-sm">{profileName || "Add your name"}</div>
-                    )}
-                  </div>
-                  <div className="mt-2 rounded-md bg-paper px-2 py-2">
-                    <div className="text-[11px] font-medium uppercase tracking-wide text-black/45">Wallet</div>
-                    <div className="mt-0.5 truncate text-xs text-black/65">{wallet}</div>
-                  </div>
-                  <div className="mt-3 flex gap-2">
-                    {profileEditing ? (
-                      <button onClick={saveProfile} disabled={profileBusy} className="flex flex-1 items-center justify-center gap-1 rounded-md bg-ink px-2 py-2 text-sm font-medium text-white disabled:opacity-50"><Save className="h-4 w-4" /> Save</button>
-                    ) : (
-                      <button onClick={() => setProfileEditing(true)} className="flex flex-1 items-center justify-center gap-1 rounded-md border border-black/10 px-2 py-2 text-sm"><Pencil className="h-4 w-4" /> Edit</button>
-                    )}
-                    <button onClick={() => { setShowCompanionForm(true); setProfileOpen(false); }} className="flex flex-1 items-center justify-center gap-1 rounded-md border border-black/10 px-2 py-2 text-sm"><Plus className="h-4 w-4" /> Companion</button>
-                  </div>
-                  <button onClick={logout} className="mt-2 w-full rounded-md px-2 py-2 text-sm text-black/60 hover:bg-paper">Log out</button>
-                </div>
-              )}
-            </div>
           </div>
-          <div className="mt-3 truncate rounded-md bg-paper px-3 py-2 text-xs text-black/55">{wallet || "Privy account active"}</div>
+          <div className="mt-3 truncate rounded-md bg-paper px-3 py-2 text-[11px] text-black/55">{wallet || "Privy account active"}</div>
 
           {(companions.length === 0 || showCompanionForm) && <div className="mt-5 space-y-3 rounded-lg border border-black/10 bg-white/60 p-3">
             <div className="flex items-center justify-between gap-2">
@@ -296,24 +304,30 @@ export function CompanionDashboard() {
             </button>
           </div>}
 
-          <div className="mt-5 space-y-2">
+          <div className="mt-5 border-t border-black/10 pt-4">
+            <div className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-black/45">
+              <span>Companions</span>
+              <span>{companions.length}</span>
+            </div>
+            <div className="space-y-2">
             {companions.map((companion) => (
-              <button key={companion.id} onClick={() => setActiveId(companion.id)} className={cn("w-full rounded-md border p-3 text-left", active?.id === companion.id ? "border-ink bg-white" : "border-black/10 bg-white/60")}>
+              <button key={companion.id} onClick={() => setActiveId(companion.id)} className={cn("w-full rounded-lg border p-3 text-left transition-colors", active?.id === companion.id ? "border-ink/30 bg-paper shadow-sm" : "border-black/10 bg-white/60 hover:bg-white")}>
                 <div className="font-medium">{companion.name}</div>
                 <div className="text-xs text-black/55">
                   L{companion.level} / {relationshipLabels[companion.relationshipLevel]} / {moodLabels[companion.mood]}
                 </div>
               </button>
             ))}
+            </div>
           </div>
         </aside>
 
-        <section className="overflow-hidden rounded-lg border border-black/10 bg-white/82 shadow-sm">
-          <div className="avatar-stage relative min-h-[360px] border-b border-black/10 p-5">
+        <section className="overflow-hidden rounded-xl border border-black/10 bg-white/82 shadow-sm">
+          <div className="avatar-stage relative min-h-[340px] border-b border-black/10 p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="text-sm font-medium text-black/55">{activeTypeLabel} / {archetype.background}</div>
-                <h2 className="mt-1 text-3xl font-semibold">{active?.name ?? "Choose a companion"}</h2>
+                <h2 className="mt-1 text-3xl font-semibold tracking-tight">{active?.name ?? "Choose a companion"}</h2>
                 <p className="mt-2 max-w-xl text-sm text-black/65">{archetype.evolution}</p>
               </div>
               {active && (
@@ -327,12 +341,12 @@ export function CompanionDashboard() {
                 </div>
               )}
             </div>
-            <div className="mx-auto mt-6 grid min-h-64 max-w-sm place-items-end">
+            <div className="mx-auto mt-5 grid min-h-56 max-w-[340px] place-items-end">
               <CompanionPortrait companion={active} accent={archetype.accent} fallbackLabel={active?.avatarKey ?? (active?.evolutionStage === 2 ? archetype.stageTwoAvatar : archetype.stageOneAvatar)} visualState={portraitState} activityState={portraitActivity} />
             </div>
           </div>
 
-          <div className="h-[420px] space-y-3 overflow-y-auto p-4">
+          <div className="h-[280px] space-y-3 overflow-y-auto p-5 lg:h-[300px]">
             {messages.length === 0 && <p className="text-sm text-black/55">Start a conversation. Your companion will save meaningful memories as you talk.</p>}
             {messages.map((chat) => (
               <div key={chat.id} className="space-y-2">
@@ -352,7 +366,7 @@ export function CompanionDashboard() {
             ))}
           </div>
 
-          <div className="border-t border-black/10 p-4">
+          <div className="border-t border-black/10 bg-white/90 p-4">
             <div className="flex gap-2">
               <input value={message} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void sendMessage(); }} className="min-w-0 flex-1 rounded-md border border-black/10 bg-white px-3 py-2" placeholder="Tell your companion something..." />
               <button onClick={sendMessage} disabled={!active || busy} className="rounded-md bg-mint px-4 py-2 font-medium text-white disabled:opacity-50">
@@ -363,8 +377,8 @@ export function CompanionDashboard() {
           </div>
         </section>
 
-        <aside className="space-y-4">
-          <div className="rounded-lg border border-black/10 bg-white/78 p-4 shadow-sm">
+        <aside className="space-y-4 lg:sticky lg:top-5 lg:h-fit">
+          <div className="rounded-xl border border-black/10 bg-white/78 p-4 shadow-sm">
             <h3 className="font-semibold">Growth</h3>
             <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
               <Metric label="Level" value={active?.level ?? 1} />
@@ -374,7 +388,7 @@ export function CompanionDashboard() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-black/10 bg-white/78 p-4 shadow-sm">
+          <div className="rounded-xl border border-black/10 bg-white/78 p-4 shadow-sm">
             <h3 className="font-semibold">Activities</h3>
             <div className="mt-3 grid grid-cols-2 gap-2">
               {activities.map(({ type: activityType, label, icon: Icon }) => (
@@ -392,7 +406,7 @@ export function CompanionDashboard() {
             <textarea value={reflection} onChange={(event) => setReflection(event.target.value)} className="mt-3 min-h-20 w-full rounded-md border border-black/10 bg-white px-3 py-2 text-sm" placeholder="Daily reflection" />
           </div>
 
-          <div className="rounded-lg border border-black/10 bg-white/78 p-4 shadow-sm">
+          <div className="rounded-xl border border-black/10 bg-white/78 p-4 shadow-sm">
             <h3 className="flex items-center gap-2 font-semibold"><Heart className="h-4 w-4" /> Memories</h3>
             <div className="mt-3 space-y-2">
               {(active?.memories ?? []).length === 0 && <p className="text-sm text-black/55">No long-term memories yet.</p>}
@@ -437,12 +451,12 @@ function CompanionPortrait({ companion, accent, fallbackLabel, visualState, acti
 
   if (image) {
     return (
-      <div className="relative grid min-h-64 w-full place-items-end overflow-hidden rounded-lg bg-white/45 px-6 pt-6 shadow-inner">
+      <div className="relative grid min-h-56 w-full place-items-end overflow-hidden rounded-lg bg-white/45 px-6 pt-6 shadow-inner">
         <div className="absolute inset-x-4 top-4 z-10 flex items-center justify-between text-xs font-medium text-black/55">
           <span className="rounded-full bg-white/80 px-2 py-1">{direction.label}</span>
           <span className="rounded-full bg-white/80 px-2 py-1 capitalize">{activityState}</span>
         </div>
-        <img key={`${companion?.id}-${visualState}`} src={image} alt={`${companion?.name ?? "Companion"}, ${direction.label.toLowerCase()} scene`} className={cn("living-portrait max-h-72 w-auto object-contain drop-shadow-xl", `living-portrait--${activityState}`)} />
+        <img key={`${companion?.id}-${visualState}`} src={image} alt={`${companion?.name ?? "Companion"}, ${direction.label.toLowerCase()} scene`} className={cn("living-portrait max-h-64 w-auto object-contain drop-shadow-xl", `living-portrait--${activityState}`)} />
       </div>
     );
   }

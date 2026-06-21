@@ -4,6 +4,17 @@ import { CompanionType } from "@prisma/client";
 import { z } from "zod";
 import { jsonError, parseJson, walletFromRequest } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
+import { defaultAgentTemplate } from "@/lib/companion/agent-templates";
+
+const agentProfileSchema = z.object({
+  role: z.string().trim().min(2).max(80),
+  mission: z.string().trim().min(10).max(500),
+  scope: z.array(z.string().trim().min(2).max(80)).min(1).max(12),
+  boundaries: z.array(z.string().trim().min(2).max(160)).max(12),
+  expertise: z.array(z.string().trim().min(2).max(80)).max(12),
+  successCriteria: z.array(z.string().trim().min(2).max(160)).max(12),
+  responseStyle: z.string().trim().min(2).max(160).optional()
+});
 
 const createSchema = z.object({
   name: z.string().min(2).max(32),
@@ -12,7 +23,8 @@ const createSchema = z.object({
   avatarKey: z.string().min(2).max(40).optional(),
   avatarImage: z.string().startsWith("data:image/").max(1_000_000).optional(),
   interests: z.array(z.string().min(2).max(40)).max(16).optional(),
-  username: z.string().min(2).max(32).optional()
+  username: z.string().min(2).max(32).optional(),
+  agentProfile: agentProfileSchema.optional()
 });
 
 export async function GET(request: Request) {
@@ -61,7 +73,18 @@ export async function POST(request: Request) {
           avatarKey: body.avatarKey ?? "default",
           customTypeName: body.type === "CUSTOM" ? body.customTypeName?.trim() : null,
           avatarImage: body.avatarImage ?? null,
-          personality: { create: {} }
+          personality: { create: {} },
+          agentProfile: {
+            create: body.agentProfile ?? {
+              role: defaultAgentTemplate.role,
+              mission: defaultAgentTemplate.mission,
+              scope: defaultAgentTemplate.scope,
+              boundaries: defaultAgentTemplate.boundaries,
+              expertise: defaultAgentTemplate.expertise,
+              successCriteria: defaultAgentTemplate.successCriteria,
+              responseStyle: defaultAgentTemplate.responseStyle
+            }
+          }
         }
       });
 

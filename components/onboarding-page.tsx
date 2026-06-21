@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
 import { Bot, Cat, Check, ImageUp, Loader2, Plus, Sparkles, UserRound } from "lucide-react";
 import { companionArchetypes } from "@/lib/companion/archetypes";
+import { agentTemplates, defaultAgentTemplate } from "@/lib/companion/agent-templates";
 import { StarterPage } from "@/components/starter-page";
 import { cn } from "@/lib/ui";
 
@@ -63,13 +64,17 @@ export function OnboardingPage() {
   const [avatarImage, setAvatarImage] = useState("");
   const [interests, setInterests] = useState<string[]>(["Technology", "Movies"]);
   const [customInterest, setCustomInterest] = useState("");
+  const [agentTemplateId, setAgentTemplateId] = useState(defaultAgentTemplate.id);
+  const [agentRole, setAgentRole] = useState(defaultAgentTemplate.role);
+  const [agentMission, setAgentMission] = useState(defaultAgentTemplate.mission);
+  const [agentScope, setAgentScope] = useState(defaultAgentTemplate.scope.join(", "));
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const wallet = user?.wallet?.address?.toLowerCase() ?? "";
   const selectedTypeLabel = type === "CUSTOM" && customTypeName.trim() ? customTypeName.trim() : companionArchetypes[type].label;
   const canCreate = useMemo(() => {
-    return Boolean(name.trim() && interests.length > 0 && (type !== "CUSTOM" || customTypeName.trim()));
-  }, [customTypeName, interests.length, name, type]);
+    return Boolean(name.trim() && interests.length > 0 && agentRole.trim() && agentMission.trim() && agentScope.split(",").some((item) => item.trim()) && (type !== "CUSTOM" || customTypeName.trim()));
+  }, [agentMission, agentRole, agentScope, customTypeName, interests.length, name, type]);
 
   if (!ready) {
     return (
@@ -96,7 +101,23 @@ export function OnboardingPage() {
           "content-type": "application/json",
           "x-wallet-address": wallet
         },
-        body: JSON.stringify({ name, type, customTypeName, avatarKey: avatarImage ? "uploaded" : avatarKey, avatarImage: avatarImage || undefined, interests })
+        body: JSON.stringify({
+          name,
+          type,
+          customTypeName,
+          avatarKey: avatarImage ? "uploaded" : avatarKey,
+          avatarImage: avatarImage || undefined,
+          interests,
+          agentProfile: {
+            role: agentRole,
+            mission: agentMission,
+            scope: agentScope.split(",").map((item) => item.trim()).filter(Boolean),
+            boundaries: agentTemplates.find((template) => template.id === agentTemplateId)?.boundaries ?? defaultAgentTemplate.boundaries,
+            expertise: agentTemplates.find((template) => template.id === agentTemplateId)?.expertise ?? defaultAgentTemplate.expertise,
+            successCriteria: agentTemplates.find((template) => template.id === agentTemplateId)?.successCriteria ?? defaultAgentTemplate.successCriteria,
+            responseStyle: agentTemplates.find((template) => template.id === agentTemplateId)?.responseStyle ?? defaultAgentTemplate.responseStyle
+          }
+        })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Unable to create companion");
@@ -111,6 +132,14 @@ export function OnboardingPage() {
   function selectType(nextType: CompanionType) {
     setType(nextType);
     setAvatarKey(avatarOptions[nextType][0].key);
+  }
+
+  function selectAgentTemplate(templateId: string) {
+    const template = agentTemplates.find((item) => item.id === templateId) ?? defaultAgentTemplate;
+    setAgentTemplateId(template.id);
+    setAgentRole(template.role);
+    setAgentMission(template.mission);
+    setAgentScope(template.scope.join(", "));
   }
 
   function toggleInterest(interest: string) {
@@ -275,6 +304,24 @@ export function OnboardingPage() {
                 </button>
               ))}
             </div>
+          </section>
+
+          <section className="rounded-lg border border-black/10 bg-white/80 p-5 shadow-sm">
+            <h2 className="text-lg font-semibold">Your companion's role</h2>
+            <p className="mt-1 text-sm text-black/55">Choose a focused role, then tailor what this companion should help with.</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {agentTemplates.map((template) => (
+                <button key={template.id} onClick={() => selectAgentTemplate(template.id)} className={cn("rounded-md border p-3 text-left text-sm", agentTemplateId === template.id ? "border-ink bg-ink text-white" : "border-black/10 bg-white")}>
+                  <div className="font-medium">{template.label}</div>
+                  <div className={cn("mt-1 text-xs", agentTemplateId === template.id ? "text-white/70" : "text-black/50")}>{template.scope.slice(0, 2).join(" · ")}</div>
+                </button>
+              ))}
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-medium">Role<input value={agentRole} onChange={(event) => setAgentRole(event.target.value)} className="mt-1.5 w-full rounded-md border border-black/10 bg-white px-3 py-2 font-normal" placeholder="e.g. Study coach" /></label>
+              <label className="text-sm font-medium">Scope<input value={agentScope} onChange={(event) => setAgentScope(event.target.value)} className="mt-1.5 w-full rounded-md border border-black/10 bg-white px-3 py-2 font-normal" placeholder="Study plans, revision, explanations" /></label>
+            </div>
+            <label className="mt-3 block text-sm font-medium">Mission<textarea value={agentMission} onChange={(event) => setAgentMission(event.target.value)} className="mt-1.5 min-h-20 w-full rounded-md border border-black/10 bg-white px-3 py-2 font-normal" placeholder="What should this companion help you achieve?" /></label>
           </section>
         </div>
       </section>

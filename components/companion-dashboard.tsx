@@ -285,7 +285,7 @@ export function CompanionDashboard() {
 
   return (
     <main className="min-h-screen px-4 py-6 text-ink sm:px-6 lg:px-8">
-      <header className="mx-auto mb-5 flex max-w-[1440px] flex-wrap items-center justify-between gap-3 rounded-2xl bg-white/80 px-4 py-3 shadow-[0_8px_28px_rgba(20,21,26,0.06)] backdrop-blur sm:px-5">
+      <header className="relative z-50 mx-auto mb-5 flex max-w-[1440px] flex-wrap items-center justify-between gap-3 rounded-2xl bg-white/80 px-4 py-3 shadow-[0_8px_28px_rgba(20,21,26,0.06)] backdrop-blur sm:px-5">
         <div className="flex min-w-0 items-center gap-4">
           <div className="shrink-0">
             <div className="text-xl font-semibold tracking-tight">MyMate</div>
@@ -310,7 +310,7 @@ export function CompanionDashboard() {
             <CircleUserRound className="h-6 w-6" />
           </button>
           {profileOpen && (
-            <div className="absolute right-0 top-14 w-80 overflow-hidden rounded-2xl border border-black/10 bg-white shadow-xl">
+            <div className="absolute right-0 top-14 z-[60] w-80 overflow-hidden rounded-2xl border border-black/10 bg-white shadow-xl">
               <div className="bg-paper px-4 py-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">

@@ -66,6 +66,8 @@ export function CompanionDashboard() {
   const archetype = active ? companionArchetypes[active.type] : companionArchetypes[type];
   const activeTypeLabel = active?.customTypeName || archetype.label;
   const messages = useMemo(() => [...(active?.chatLogs ?? [])].reverse(), [active?.chatLogs]);
+  const latestChat = active?.chatLogs?.[0];
+  const recentTopic = conversationTopic(latestChat?.userMessage);
 
   useEffect(() => {
     const latest = active?.chatLogs?.[0];
@@ -340,15 +342,22 @@ export function CompanionDashboard() {
 
         <section className="overflow-hidden rounded-xl border border-black/10 bg-white/82 shadow-sm">
           <div className="avatar-stage border-b border-black/10 p-5 sm:p-6">
-            <div className="grid items-center gap-6 md:grid-cols-[minmax(0,1fr)_260px]">
-              <div className="mx-auto grid w-full max-w-[360px] place-items-end md:mx-0">
+            <div className="grid items-start gap-5 md:grid-cols-[minmax(0,1.2fr)_300px] md:gap-7">
+              <div className="mx-auto grid w-full max-w-[430px] place-items-end md:mx-0">
                 <CompanionPortrait companion={active} accent={archetype.accent} fallbackLabel={active?.avatarKey ?? (active?.evolutionStage === 2 ? archetype.stageTwoAvatar : archetype.stageOneAvatar)} visualState={portraitState} activityState={portraitActivity} />
               </div>
               <div className="min-w-0">
                 <div className="text-xs font-semibold uppercase tracking-wide text-black/45">{activeTypeLabel}</div>
                 <h2 className="mt-1 truncate text-3xl font-semibold tracking-tight">{active?.name ?? "Choose a companion"}</h2>
                 <p className="mt-2 text-sm leading-6 text-black/60">{archetype.evolution}</p>
-                <div className="mt-4 grid grid-cols-2 gap-2">
+                <div className="mt-3 rounded-xl border border-white/80 bg-white/65 p-3">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-black/45">Right now</div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-black/65"><Sparkles className="h-3.5 w-3.5 text-ember" /> Feeling {portraitDirections[portraitState].label.toLowerCase()}</span>
+                    <span className="inline-flex max-w-full items-center gap-1.5 truncate rounded-full bg-white px-2.5 py-1 text-xs font-medium text-black/65"><MessageCircle className="h-3.5 w-3.5 text-mint" /> Last discussed: {recentTopic}</span>
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
                   <div className="rounded-xl bg-white/80 p-3 shadow-sm">
                     <div className="text-xs text-black/45">Mood</div>
                     <div className="mt-1 text-sm font-semibold">{moodLabels[active?.mood ?? "NEUTRAL"]}</div>
@@ -358,12 +367,12 @@ export function CompanionDashboard() {
                     <div className="mt-1 text-sm font-semibold">{relationshipLabels[active?.relationshipLevel ?? 1]}</div>
                   </div>
                 </div>
-                <div className="mt-3 rounded-xl bg-white/80 p-3 shadow-sm">
+                <div className="mt-2 rounded-xl bg-white/80 p-3 shadow-sm">
                   <div className="flex items-center justify-between text-xs text-black/50"><span>Level {active?.level ?? 1}</span><span>{active?.xp ?? 0} XP</span></div>
                   <div className="mt-2 h-2 overflow-hidden rounded-full bg-black/[0.08]"><div className="h-full rounded-full bg-ember transition-all" style={{ width: `${Math.min(100, (active?.xp ?? 0) % 100)}%` }} /></div>
                   <div className="mt-1.5 text-xs text-black/45">{100 - ((active?.xp ?? 0) % 100)} XP to the next level</div>
                 </div>
-                <div className="mt-3 flex gap-2">
+                <div className="mt-2 flex gap-2">
                   <button onClick={() => runActivity("DAILY_CHECK_IN")} disabled={!active || busy} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-black/10 bg-white px-2 py-2 text-sm font-medium disabled:opacity-50"><CalendarCheck className="h-4 w-4" /> Check in</button>
                   <button onClick={() => runActivity("REFLECTION_PROMPT")} disabled={!active || busy} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-black/10 bg-white px-2 py-2 text-sm font-medium disabled:opacity-50"><Brain className="h-4 w-4" /> Reflect</button>
                 </div>
@@ -481,18 +490,28 @@ function MessageAvatar({ label, image, kind }: { label: string; image?: string |
   );
 }
 
+function conversationTopic(message?: string) {
+  if (!message) return "Getting to know each other";
+  if (/\b(anime|movie|film|show|series|character)\b/i.test(message)) return "Movies & anime";
+  if (/\b(sport|sports|game|gaming|match|football|soccer|cricket|basketball|esport)\b/i.test(message)) return "Games & sport";
+  if (/\b(code|coding|technology|tech|program|debug|computer|software|ai|build|study|work|project)\b/i.test(message)) return "Technology";
+  if (/\b(help|support|sad|anxious|anxiety|stressed|overwhelmed|lonely|grief|hurt|sorry|difficult)\b/i.test(message)) return "A supportive conversation";
+  if (/\b(reflect|reflection|meaning|life|future|memory|memories|thoughtful|serious|philosophy|purpose)\b/i.test(message)) return "A reflective moment";
+  return "Your latest conversation";
+}
+
 function CompanionPortrait({ companion, accent, fallbackLabel, visualState, activityState }: { companion?: Companion; accent: string; fallbackLabel: string; visualState: PortraitVisualState; activityState: PortraitActivityState }) {
   const image = companion?.portraitVariants?.[visualState] || companion?.generatedPortrait || companion?.avatarImage;
   const direction = portraitDirections[visualState];
 
   if (image) {
     return (
-      <div className="relative grid min-h-56 w-full place-items-end overflow-hidden rounded-lg bg-white/45 px-6 pt-6 shadow-inner">
+      <div className="relative grid min-h-72 w-full place-items-end overflow-hidden rounded-xl bg-white/45 px-6 pt-6 shadow-inner">
         <div className="absolute inset-x-4 top-4 z-10 flex items-center justify-between text-xs font-medium text-black/55">
           <span className="rounded-full bg-white/80 px-2 py-1">{direction.label}</span>
           <span className="rounded-full bg-white/80 px-2 py-1 capitalize">{activityState}</span>
         </div>
-        <img key={`${companion?.id}-${visualState}`} src={image} alt={`${companion?.name ?? "Companion"}, ${direction.label.toLowerCase()} scene`} className={cn("living-portrait max-h-64 w-auto object-contain drop-shadow-xl", `living-portrait--${activityState}`)} />
+        <img key={`${companion?.id}-${visualState}`} src={image} alt={`${companion?.name ?? "Companion"}, ${direction.label.toLowerCase()} scene`} className={cn("living-portrait max-h-80 w-auto object-contain drop-shadow-xl", `living-portrait--${activityState}`)} />
       </div>
     );
   }

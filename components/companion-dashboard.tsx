@@ -11,6 +11,7 @@ import { cn } from "@/lib/ui";
 type CompanionType = "ROBOT" | "PET" | "ANIME_GIRL" | "SPIRIT" | "CUSTOM";
 type CompanionMood = "HAPPY" | "NEUTRAL" | "LONELY" | "EXCITED";
 type ActivityType = "DAILY_CHECK_IN" | "FEED_COMPANION" | "PLAY_MINI_GAME" | "REFLECTION_PROMPT";
+type AgentGoal = { id: string; title: string; status: "ACTIVE" | "PAUSED" | "COMPLETE"; priority: number; progress: number; nextStep?: string | null };
 
 type Companion = {
   id: string;
@@ -60,6 +61,7 @@ export function CompanionDashboard() {
   const [profileEditing, setProfileEditing] = useState(false);
   const [profileName, setProfileName] = useState("");
   const [profileBusy, setProfileBusy] = useState(false);
+  const [agentGoals, setAgentGoals] = useState<AgentGoal[]>([]);
   const wallet = user?.wallet?.address?.toLowerCase() ?? "";
 
   const active = companions.find((companion) => companion.id === activeId) ?? companions[0];
@@ -68,12 +70,18 @@ export function CompanionDashboard() {
   const messages = useMemo(() => [...(active?.chatLogs ?? [])].reverse(), [active?.chatLogs]);
   const latestChat = active?.chatLogs?.[0];
   const recentTopic = conversationTopic(latestChat?.userMessage);
+  const currentAgentGoal = agentGoals.find((goal) => goal.status === "ACTIVE");
 
   useEffect(() => {
     const latest = active?.chatLogs?.[0];
     setPortraitState(latest ? selectPortraitState(latest.userMessage, latest.companionResponse) : "supportive");
     setPortraitActivity("idle");
   }, [active?.id]);
+
+  useEffect(() => {
+    if (active?.id && wallet) void loadAgentGoals(active.id);
+    else setAgentGoals([]);
+  }, [active?.id, wallet]);
 
   useEffect(() => {
     if (wallet) {
@@ -111,6 +119,16 @@ export function CompanionDashboard() {
       if (data.profile?.username) setProfileName(data.profile.username);
     } catch {
       // A profile is created during onboarding, so the dashboard can still work while it is unavailable.
+    }
+  }
+
+  async function loadAgentGoals(companionId: string) {
+    try {
+      const data = await fetch(`/api/companions/${companionId}/goals`, { headers: { "x-wallet-address": wallet } }).then((response) => response.json());
+      const projectGoals = (data.projects ?? []).flatMap((project: { goals?: AgentGoal[] }) => project.goals ?? []);
+      setAgentGoals([...(data.goals ?? []), ...projectGoals]);
+    } catch {
+      setAgentGoals([]);
     }
   }
 
@@ -358,6 +376,11 @@ export function CompanionDashboard() {
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-black/65"><Sparkles className="h-3.5 w-3.5 text-ember" /> Feeling {portraitDirections[portraitState].label.toLowerCase()}</span>
                     <span className="inline-flex max-w-full items-center gap-1.5 truncate rounded-full bg-white px-2.5 py-1 text-xs font-medium text-black/65"><MessageCircle className="h-3.5 w-3.5 text-mint" /> Last discussed: {recentTopic}</span>
                   </div>
+                  {currentAgentGoal && <div className="mt-3 rounded-lg bg-white/80 p-2.5">
+                    <div className="flex items-center justify-between gap-3"><span className="text-xs font-semibold text-black/55">Current focus</span><span className="text-xs font-medium text-ember">{currentAgentGoal.progress}%</span></div>
+                    <div className="mt-1 truncate text-sm font-semibold">{currentAgentGoal.title}</div>
+                    {currentAgentGoal.nextStep && <div className="mt-1 text-xs text-black/55">Next: {currentAgentGoal.nextStep}</div>}
+                  </div>}
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <div className="rounded-xl bg-white/80 p-3 shadow-sm">

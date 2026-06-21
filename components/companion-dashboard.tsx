@@ -12,6 +12,7 @@ type CompanionType = "ROBOT" | "PET" | "ANIME_GIRL" | "SPIRIT" | "CUSTOM";
 type CompanionMood = "HAPPY" | "NEUTRAL" | "LONELY" | "EXCITED";
 type ActivityType = "DAILY_CHECK_IN" | "FEED_COMPANION" | "PLAY_MINI_GAME" | "REFLECTION_PROMPT";
 type AgentGoal = { id: string; title: string; status: "ACTIVE" | "PAUSED" | "COMPLETE"; priority: number; progress: number; nextStep?: string | null };
+type AgentInsights = { role: string; mission: string; capabilities: string[]; learned: { id: string; category: string; content: string; importance: number }[]; feedback: { helpful: number; unhelpful: number; corrected: number } };
 
 type Companion = {
   id: string;
@@ -65,6 +66,7 @@ export function CompanionDashboard() {
   const [feedbackByChat, setFeedbackByChat] = useState<Record<string, "HELPFUL" | "UNHELPFUL" | "CORRECTED">>({});
   const [correctionChatId, setCorrectionChatId] = useState("");
   const [correctionNote, setCorrectionNote] = useState("");
+  const [agentInsights, setAgentInsights] = useState<AgentInsights | null>(null);
   const wallet = user?.wallet?.address?.toLowerCase() ?? "";
 
   const active = companions.find((companion) => companion.id === activeId) ?? companions[0];
@@ -82,8 +84,13 @@ export function CompanionDashboard() {
   }, [active?.id]);
 
   useEffect(() => {
-    if (active?.id && wallet) void loadAgentGoals(active.id);
-    else setAgentGoals([]);
+    if (active?.id && wallet) {
+      void loadAgentGoals(active.id);
+      void loadAgentInsights(active.id);
+    } else {
+      setAgentGoals([]);
+      setAgentInsights(null);
+    }
   }, [active?.id, wallet]);
 
   useEffect(() => {
@@ -132,6 +139,15 @@ export function CompanionDashboard() {
       setAgentGoals([...(data.goals ?? []), ...projectGoals]);
     } catch {
       setAgentGoals([]);
+    }
+  }
+
+  async function loadAgentInsights(companionId: string) {
+    try {
+      const data = await fetch(`/api/companions/${companionId}/insights`, { headers: { "x-wallet-address": wallet } }).then((response) => response.json());
+      setAgentInsights(data.insights ?? null);
+    } catch {
+      setAgentInsights(null);
     }
   }
 
@@ -530,6 +546,24 @@ export function CompanionDashboard() {
               ))}
             </div>
           </div>
+          {agentInsights && <details className="group lg:contents">
+            <summary className="flex cursor-pointer list-none items-center justify-between rounded-xl bg-white/72 px-4 py-3 font-semibold shadow-[0_8px_28px_rgba(20,21,26,0.05)] lg:hidden">
+              <span className="flex items-center gap-2"><Brain className="h-4 w-4" /> Agent learning</span><span className="text-xs font-normal text-black/45">{agentInsights.learned.length}</span>
+            </summary>
+            <div className="mobile-collapsible mt-2 hidden lg:mt-0 lg:block">
+              <div className="rounded-xl bg-white/72 p-4 shadow-[0_8px_28px_rgba(20,21,26,0.05)]">
+                <div className="flex items-center justify-between"><h3 className="flex items-center gap-2 font-semibold"><Brain className="h-4 w-4" /> Agent learning</h3><span className="text-xs text-black/45">Context, not retraining</span></div>
+                <div className="mt-2 text-xs text-black/55">{agentInsights.role}</div>
+                {agentInsights.capabilities.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{agentInsights.capabilities.slice(0, 3).map((capability) => <span key={capability} className="rounded-full bg-paper px-2 py-1 text-[11px] text-black/60">{capability}</span>)}</div>}
+                <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+                  <div className="rounded-lg bg-paper p-2"><div className="text-sm font-semibold">{agentInsights.feedback.helpful}</div><div className="mt-0.5 text-black/45">Helpful</div></div>
+                  <div className="rounded-lg bg-paper p-2"><div className="text-sm font-semibold">{agentInsights.feedback.unhelpful}</div><div className="mt-0.5 text-black/45">Unhelpful</div></div>
+                  <div className="rounded-lg bg-paper p-2"><div className="text-sm font-semibold">{agentInsights.feedback.corrected}</div><div className="mt-0.5 text-black/45">Corrected</div></div>
+                </div>
+                {agentInsights.learned.length > 0 && <div className="mt-3 space-y-2">{agentInsights.learned.slice(0, 3).map((memory) => <div key={memory.id} className="rounded-lg bg-paper p-2 text-xs"><div className="mb-1 font-medium uppercase tracking-wide text-black/45">{memory.category}</div><div className="max-h-10 overflow-hidden text-black/65">{memory.content}</div></div>)}</div>}
+              </div>
+            </div>
+          </details>}
         </aside>
       </section>
     </main>

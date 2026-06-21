@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Activity, Archive, Bot, Brain, CalendarCheck, CircleUserRound, Heart, ImageUp, Loader2, MessageCircle, MessageSquarePlus, Pencil, Plus, Save, Sparkles, ThumbsDown, ThumbsUp, UserRound, Utensils, X } from "lucide-react";
 import { usePrivy } from "@privy-io/react-auth";
 import { companionArchetypes, moodLabels, relationshipLabels } from "@/lib/companion/archetypes";
-import { agentTemplates, defaultAgentTemplate } from "@/lib/companion/agent-templates";
+import { actionsForAgent, agentTemplates, defaultAgentTemplate } from "@/lib/companion/agent-templates";
 import { portraitDirections, selectPortraitState, type PortraitActivityState, type PortraitVisualState } from "@/lib/companion/portrait-state";
 import { cn } from "@/lib/ui";
 
@@ -25,7 +25,7 @@ type Companion = {
   generatedPortrait?: string | null;
   portraitPrompt?: string | null;
   portraitVariants?: Partial<Record<PortraitVisualState, string>> | null;
-  agentProfile?: { templateId?: string | null } | null;
+  agentProfile?: { templateId?: string | null; role?: string | null; scope?: string[] | null } | null;
   level: number;
   xp: number;
   mood: CompanionMood;
@@ -75,7 +75,8 @@ export function CompanionDashboard() {
   const archetype = active ? companionArchetypes[active.type] : companionArchetypes[type];
   const activeTypeLabel = active?.customTypeName || archetype.label;
   const agentTemplate = agentTemplates.find((template) => template.id === active?.agentProfile?.templateId) ?? defaultAgentTemplate;
-  const agentActions = agentTemplate.actions;
+  const agentActions = actionsForAgent(active?.agentProfile);
+  const agentActionLabel = active?.agentProfile?.role || agentTemplate.label;
   const usesMoodGame = agentActions.some((action) => action.type === "PLAY_MINI_GAME");
   const messages = useMemo(() => [...(active?.chatLogs ?? [])].reverse(), [active?.chatLogs]);
   const latestChat = active?.chatLogs?.[0];
@@ -519,7 +520,7 @@ export function CompanionDashboard() {
           </div>
 
           <div className="rounded-xl bg-white/72 p-4 shadow-[0_8px_28px_rgba(20,21,26,0.05)]">
-            <div className="flex items-center justify-between"><h3 className="font-semibold">Agent actions</h3><span className="text-xs text-black/45">{agentTemplate.label}</span></div>
+            <div className="flex items-center justify-between"><h3 className="font-semibold">Agent actions</h3><span className="text-xs text-black/45">{agentActionLabel}</span></div>
             <div className="mt-3 grid grid-cols-2 gap-2">
               {agentActions.map(({ type: activityType, label }) => {
                 const Icon = activityIcons[activityType];

@@ -94,3 +94,32 @@ export const agentTemplates: AgentTemplate[] = [
 ];
 
 export const defaultAgentTemplate = agentTemplates.find((template) => template.id === "GENERAL_COMPANION")!;
+
+type AgentAction = AgentTemplate["actions"][number];
+
+export function actionsForAgent(agent?: { templateId?: string | null; role?: string | null; scope?: string[] | null }): AgentAction[] {
+  const template = agentTemplates.find((item) => item.id === agent?.templateId);
+  if (template && template.id !== "CUSTOM_AGENT") return template.actions;
+
+  const focus = `${agent?.role ?? ""} ${(agent?.scope ?? []).join(" ")}`.toLowerCase();
+  if (/\b(trading|trader|market|nft|crypto|investment|investing)\b/.test(focus)) {
+    return [
+      { type: "DAILY_CHECK_IN", label: "Review market research" },
+      { type: "REFLECTION_PROMPT", label: "Update trading thesis" }
+    ];
+  }
+  if (/\b(travel|trip|itinerary)\b/.test(focus)) {
+    return [
+      { type: "DAILY_CHECK_IN", label: "Plan next detail" },
+      { type: "REFLECTION_PROMPT", label: "Review itinerary" }
+    ];
+  }
+  if (/\b(language|tutor|learning)\b/.test(focus)) {
+    return [
+      { type: "DAILY_CHECK_IN", label: "Start practice" },
+      { type: "REFLECTION_PROMPT", label: "Review progress" }
+    ];
+  }
+
+  return template?.actions ?? [{ type: "DAILY_CHECK_IN", label: "Check focus" }, { type: "REFLECTION_PROMPT", label: "Review progress" }];
+}

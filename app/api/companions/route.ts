@@ -5,6 +5,7 @@ import { z } from "zod";
 import { jsonError, parseJson, walletFromRequest } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 import { defaultAgentTemplate } from "@/lib/companion/agent-templates";
+import { workflowDefinitionsForAgent } from "@/lib/companion/agent-templates";
 
 const agentProfileSchema = z.object({
   role: z.string().trim().min(2).max(80),
@@ -68,6 +69,18 @@ export async function POST(request: Request) {
       create: { walletAddress, username: body.username, nonce: crypto.randomBytes(16).toString("hex") }
     });
 
+    const profile = body.agentProfile ?? {
+      role: defaultAgentTemplate.role,
+      templateId: defaultAgentTemplate.id,
+      mission: defaultAgentTemplate.mission,
+      scope: defaultAgentTemplate.scope,
+      boundaries: defaultAgentTemplate.boundaries,
+      expertise: defaultAgentTemplate.expertise,
+      successCriteria: defaultAgentTemplate.successCriteria,
+      responseStyle: defaultAgentTemplate.responseStyle,
+      validationStatus: "APPROVED" as const
+    };
+
     const companion = await prisma.$transaction(async (tx) => {
       const created = await tx.companion.create({
         data: {
@@ -78,20 +91,12 @@ export async function POST(request: Request) {
           customTypeName: body.type === "CUSTOM" ? body.customTypeName?.trim() : null,
           avatarImage: body.avatarImage ?? null,
           personality: { create: {} },
-          agentProfile: {
-            create: body.agentProfile ?? {
-              role: defaultAgentTemplate.role,
-              templateId: defaultAgentTemplate.id,
-              mission: defaultAgentTemplate.mission,
-              scope: defaultAgentTemplate.scope,
-              boundaries: defaultAgentTemplate.boundaries,
-              expertise: defaultAgentTemplate.expertise,
-              successCriteria: defaultAgentTemplate.successCriteria,
-              responseStyle: defaultAgentTemplate.responseStyle,
-              validationStatus: "APPROVED"
-            }
-          }
+          agentProfile: { create: profile }
         }
+      });
+
+      await tx.agentActionDefinition.createMany({
+        data: workflowDefinitionsForAgent(profile).map((action) => ({ ...action, companionId: created.id, source: profile.templateId === "CUSTOM_AGENT" ? "ROLE_INFERENCE" : "TEMPLATE" }))
       });
 
       const interests = [...new Set((body.interests ?? []).map((interest) => interest.trim()).filter(Boolean))];

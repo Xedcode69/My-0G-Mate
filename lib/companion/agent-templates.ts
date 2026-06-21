@@ -50,7 +50,7 @@ export const agentTemplates: AgentTemplate[] = [
     successCriteria: ["Improves study consistency", "Tracks topics and learning preferences"],
     responseStyle: "Clear, motivating, and structured",
     suggestedInterests: ["Science", "History", "Technology"],
-    actions: [{ type: "DAILY_CHECK_IN", label: "Plan session" }, { type: "REFLECTION_PROMPT", label: "Review learning" }]
+    actions: [{ type: "DAILY_CHECK_IN", label: "Build study plan" }, { type: "REFLECTION_PROMPT", label: "Review learning" }]
   },
   {
     id: "ANIME_GUIDE",
@@ -63,7 +63,7 @@ export const agentTemplates: AgentTemplate[] = [
     successCriteria: ["Recommendations improve from ratings", "Maintains a useful watch profile"],
     responseStyle: "Playful, spoiler-aware, and concise",
     suggestedInterests: ["Anime", "Movies", "Music", "Gaming"],
-    actions: [{ type: "DAILY_CHECK_IN", label: "Update watchlist" }, { type: "REFLECTION_PROMPT", label: "Rate a pick" }]
+    actions: [{ type: "DAILY_CHECK_IN", label: "Build watchlist" }, { type: "REFLECTION_PROMPT", label: "Refine taste profile" }]
   },
   {
     id: "FITNESS_COACH",
@@ -76,7 +76,7 @@ export const agentTemplates: AgentTemplate[] = [
     successCriteria: ["Builds consistent routines", "Adapts plans from user feedback"],
     responseStyle: "Positive, practical, and accountable",
     suggestedInterests: ["Fitness", "Music", "Science"],
-    actions: [{ type: "DAILY_CHECK_IN", label: "Log workout" }, { type: "REFLECTION_PROMPT", label: "Review recovery" }]
+    actions: [{ type: "DAILY_CHECK_IN", label: "Generate fitness plan" }, { type: "REFLECTION_PROMPT", label: "Build food guidance" }]
   },
   {
     id: "CODING_PARTNER",
@@ -89,7 +89,7 @@ export const agentTemplates: AgentTemplate[] = [
     successCriteria: ["Keeps project context", "Produces actionable technical guidance"],
     responseStyle: "Direct, precise, and collaborative",
     suggestedInterests: ["Technology", "Science", "Gaming"],
-    actions: [{ type: "DAILY_CHECK_IN", label: "Set next task" }, { type: "REFLECTION_PROMPT", label: "Record decision" }]
+    actions: [{ type: "DAILY_CHECK_IN", label: "Plan feature" }, { type: "REFLECTION_PROMPT", label: "Debug an issue" }]
   }
 ];
 
@@ -105,7 +105,7 @@ export function actionsForAgent(agent?: { templateId?: string | null; role?: str
   if (/\b(trading|trader|market|nft|crypto|investment|investing)\b/.test(focus)) {
     return [
       { type: "DAILY_CHECK_IN", label: "Review market research" },
-      { type: "REFLECTION_PROMPT", label: "Update trading thesis" }
+      { type: "REFLECTION_PROMPT", label: "Build trading thesis" }
     ];
   }
   if (/\b(travel|trip|itinerary)\b/.test(focus)) {
@@ -122,4 +122,67 @@ export function actionsForAgent(agent?: { templateId?: string | null; role?: str
   }
 
   return template?.actions ?? [{ type: "DAILY_CHECK_IN", label: "Check focus" }, { type: "REFLECTION_PROMPT", label: "Review progress" }];
+}
+
+export function workflowDefinitionsForAgent(agent?: { templateId?: string | null; role?: string | null; scope?: string[] | null }) {
+  return actionsForAgent(agent).map((action, index) => {
+    const detail = workflowDetail(action.label, agent?.role || "specialist agent");
+    return {
+      key: action.label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""),
+      label: action.label,
+      description: detail.description,
+      starterQuestion: detail.starterQuestion,
+      workflowInstructions: detail.workflowInstructions,
+      requiredInformation: detail.requiredInformation,
+      completionCriteria: detail.completionCriteria,
+      safetyConstraints: detail.safetyConstraints,
+      sortOrder: index
+    };
+  });
+}
+
+function workflowDetail(label: string, role: string) {
+  const defaults = {
+    description: `Work with your ${role} on a focused next step.`,
+    starterQuestion: `What would you like to accomplish through this ${label.toLowerCase()} workflow?`,
+    workflowInstructions: "Ask focused follow-up questions one at a time. Summarize the outcome, record an actionable next step, and do not mark the workflow complete until the user confirms the result is useful.",
+    requiredInformation: ["user objective", "current context", "constraints"],
+    completionCriteria: "A clear outcome and next step have been agreed with the user.",
+    safetyConstraints: ["Be transparent about uncertainty", "Do not claim external actions were performed"]
+  };
+  const specifics: Record<string, typeof defaults> = {
+    "Generate fitness plan": {
+      description: "Build a sustainable, personalized fitness plan through a guided conversation.",
+      starterQuestion: "What is your primary goal, current experience level, available days, equipment, and any injuries or limitations I should respect?",
+      workflowInstructions: "Collect goals, experience, schedule, equipment, preferences, and limitations. Produce a gradual plan with sessions, recovery guidance, and an achievable next workout. Do not diagnose injuries or replace medical advice.",
+      requiredInformation: ["fitness goal", "experience level", "available days", "equipment", "limitations"],
+      completionCriteria: "A practical plan and first workout are agreed with the user.",
+      safetyConstraints: ["Do not diagnose injuries", "Encourage professional advice for pain or medical conditions"]
+    },
+    "Build food guidance": {
+      description: "Create general, preference-aware food planning guidance.",
+      starterQuestion: "What is your goal, dietary preference, cooking routine, budget, and any allergies or medical dietary advice you already follow?",
+      workflowInstructions: "Gather goals, preferences, routine, budget, and constraints. Offer flexible meal ideas and a shopping approach. Do not prescribe treatment diets or give medical nutrition advice.",
+      requiredInformation: ["goal", "dietary preferences", "routine", "budget", "allergies or constraints"],
+      completionCriteria: "The user has a realistic food-guidance plan and next meal-prep step.",
+      safetyConstraints: ["Do not replace medical or dietitian advice", "Avoid treatment claims"]
+    },
+    "Review market research": {
+      description: "Organize market research, assumptions, and open questions for a trading thesis.",
+      starterQuestion: "Which asset or collection are you researching, what is your time horizon, and what evidence currently supports your thesis?",
+      workflowInstructions: "Collect the asset, thesis, evidence, time horizon, risks, and invalidation conditions. Identify missing evidence and summarize research questions. Do not execute trades or claim current market data without a verified tool.",
+      requiredInformation: ["asset", "time horizon", "supporting evidence", "risk factors", "invalidation conditions"],
+      completionCriteria: "A research summary, open questions, and risk assumptions are recorded.",
+      safetyConstraints: ["Not financial advice", "Do not promise returns", "Do not claim live market data without verification"]
+    },
+    "Build trading thesis": {
+      description: "Turn research into a clear, falsifiable trading thesis.",
+      starterQuestion: "What is the core thesis, what would invalidate it, and what risks are you willing to acknowledge before acting?",
+      workflowInstructions: "Help the user articulate thesis, catalysts, invalidation conditions, timeframe, and risks. Emphasize uncertainty and independent verification; do not recommend executing a trade.",
+      requiredInformation: ["thesis", "catalysts", "invalidation", "timeframe", "risk assumptions"],
+      completionCriteria: "A falsifiable thesis and risk checklist are saved.",
+      safetyConstraints: ["Not financial advice", "Do not guarantee outcomes", "Do not recommend trade execution"]
+    }
+  };
+  return specifics[label] ?? defaults;
 }

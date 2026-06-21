@@ -30,6 +30,15 @@ enum ActivityType {
   ASK_COMPANION_QUESTION
 }
 
+enum AgentMemoryCategory {
+  PREFERENCE
+  GOAL
+  FEEDBACK
+  FACT
+  DECISION
+  PROJECT
+}
+
 model User {
   id            String      @id @default(cuid())
   walletAddress String      @unique @map("wallet_address")
@@ -63,6 +72,7 @@ model Companion {
   createdAt         DateTime             @default(now()) @map("created_at")
   user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   memories          Memory[]
+  agentMemories     AgentMemory[]
   personality       PersonalityProfile?
   agentProfile      AgentProfile?
   activityLogs      ActivityLog[]
@@ -71,6 +81,22 @@ model Companion {
 
   @@index([userId])
   @@map("companions")
+}
+
+model AgentMemory {
+  id          String              @id @default(cuid())
+  companionId String              @map("companion_id")
+  category    AgentMemoryCategory
+  content     String
+  importance  Int                 @default(5)
+  confidence  Float               @default(1)
+  tags        String[]            @default([])
+  createdAt   DateTime            @default(now()) @map("created_at")
+  lastUsedAt  DateTime?           @map("last_used_at")
+  companion   Companion           @relation(fields: [companionId], references: [id], onDelete: Cascade)
+
+  @@index([companionId, category, importance])
+  @@map("agent_memories")
 }
 
 model AgentProfile {

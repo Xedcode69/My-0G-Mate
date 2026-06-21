@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Activity, Archive, Bot, Brain, CalendarCheck, Heart, Loader2, MessageCircle, Sparkles, Utensils } from "lucide-react";
+import { Activity, Archive, Bot, Brain, CalendarCheck, CircleUserRound, Heart, ImageUp, Loader2, MessageCircle, Pencil, Plus, Save, Sparkles, UserRound, Utensils, X } from "lucide-react";
 import { usePrivy } from "@privy-io/react-auth";
 import { companionArchetypes, moodLabels, relationshipLabels } from "@/lib/companion/archetypes";
+import { portraitDirections, selectPortraitState, type PortraitActivityState, type PortraitVisualState } from "@/lib/companion/portrait-state";
 import { cn } from "@/lib/ui";
 
 type CompanionType = "ROBOT" | "PET" | "ANIME_GIRL" | "SPIRIT" | "CUSTOM";
@@ -18,6 +19,9 @@ type Companion = {
   avatarKey: string;
   customTypeName?: string | null;
   avatarImage?: string | null;
+  generatedPortrait?: string | null;
+  portraitPrompt?: string | null;
+  portraitVariants?: Partial<Record<PortraitVisualState, string>> | null;
   level: number;
   xp: number;
   mood: CompanionMood;
@@ -48,6 +52,14 @@ export function CompanionDashboard() {
   const [moodGuess, setMoodGuess] = useState<CompanionMood>("HAPPY");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const [portraitBusy, setPortraitBusy] = useState(false);
+  const [portraitState, setPortraitState] = useState<PortraitVisualState>("supportive");
+  const [portraitActivity, setPortraitActivity] = useState<PortraitActivityState>("idle");
+  const [showCompanionForm, setShowCompanionForm] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileEditing, setProfileEditing] = useState(false);
+  const [profileName, setProfileName] = useState("");
+  const [profileBusy, setProfileBusy] = useState(false);
   const wallet = user?.wallet?.address?.toLowerCase() ?? "";
 
   const active = companions.find((companion) => companion.id === activeId) ?? companions[0];
@@ -56,7 +68,16 @@ export function CompanionDashboard() {
   const messages = useMemo(() => [...(active?.chatLogs ?? [])].reverse(), [active?.chatLogs]);
 
   useEffect(() => {
-    if (wallet) void loadCompanions(wallet);
+    const latest = active?.chatLogs?.[0];
+    setPortraitState(latest ? selectPortraitState(latest.userMessage, latest.companionResponse) : "supportive");
+    setPortraitActivity("idle");
+  }, [active?.id]);
+
+  useEffect(() => {
+    if (wallet) {
+      void loadCompanions(wallet);
+      void loadProfile();
+    }
   }, [wallet]);
 
   async function request<T>(url: string, init?: RequestInit): Promise<T> {
@@ -82,6 +103,35 @@ export function CompanionDashboard() {
     if (loaded.length === 0) router.replace("/onboarding");
   }
 
+  async function loadProfile() {
+    try {
+      const data = await fetch("/api/profile", { headers: { "x-wallet-address": wallet } }).then((response) => response.json());
+      if (data.profile?.username) setProfileName(data.profile.username);
+    } catch {
+      // A profile is created during onboarding, so the dashboard can still work while it is unavailable.
+    }
+  }
+
+  async function saveProfile() {
+    if (profileName.trim().length < 2) {
+      setStatus("Profile name must be at least 2 characters");
+      return;
+    }
+    setProfileBusy(true);
+    try {
+      await request<{ profile: { username: string } }>("/api/profile", {
+        method: "PATCH",
+        body: JSON.stringify({ username: profileName.trim() })
+      });
+      setProfileEditing(false);
+      setStatus("Profile saved");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Unable to save profile");
+    } finally {
+      setProfileBusy(false);
+    }
+  }
+
   async function createCompanion() {
     setBusy(true);
     try {
@@ -91,6 +141,7 @@ export function CompanionDashboard() {
       });
       setCompanions((current) => [data.companion, ...current]);
       setActiveId(data.companion.id);
+      setShowCompanionForm(false);
       setStatus(`${data.companion.name} joined you`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Unable to create companion");
@@ -104,14 +155,21 @@ export function CompanionDashboard() {
     const userMessage = message;
     setMessage("");
     setBusy(true);
+    setPortraitActivity("listening");
+    setPortraitState(selectPortraitState(userMessage));
     try {
-      const data = await request<{ companion: Companion; response: string; memoriesCreated: number }>(`/api/companions/${active.id}/chat`, {
+      setPortraitActivity("thinking");
+      const data = await request<{ companion: Companion; response: string; memoriesCreated: number; portraitState: PortraitVisualState }>(`/api/companions/${active.id}/chat`, {
         method: "POST",
         body: JSON.stringify({ message: userMessage })
       });
       replaceCompanion(data.companion);
+      setPortraitState(data.portraitState);
+      setPortraitActivity("replying");
+      window.setTimeout(() => setPortraitActivity("idle"), 1200);
       setStatus(data.memoriesCreated ? `Saved ${data.memoriesCreated} new memory` : "Conversation saved");
     } catch (error) {
+      setPortraitActivity("idle");
       setStatus(error instanceof Error ? error.message : "Chat failed");
     } finally {
       setBusy(false);
@@ -121,6 +179,7 @@ export function CompanionDashboard() {
   async function runActivity(activityType: ActivityType) {
     if (!active) return;
     setBusy(true);
+    setPortraitActivity(activityType === "PLAY_MINI_GAME" ? "celebrating" : "thinking");
     try {
       const data = await request<{ companion: Companion; xpEarned: number; guessedCorrectly?: boolean }>(`/api/companions/${active.id}/activities`, {
         method: "POST",
@@ -129,10 +188,26 @@ export function CompanionDashboard() {
       replaceCompanion(data.companion);
       setReflection("");
       setStatus(`+${data.xpEarned} XP`);
+      window.setTimeout(() => setPortraitActivity("idle"), 1200);
     } catch (error) {
+      setPortraitActivity("idle");
       setStatus(error instanceof Error ? error.message : "Activity failed");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function generatePortrait() {
+    if (!active) return;
+    setPortraitBusy(true);
+    try {
+      const data = await request<{ companion: Companion; provider: string }>(`/api/companions/${active.id}/portrait`, { method: "POST" });
+      replaceCompanion(data.companion);
+      setStatus(data.provider === "fallback" ? "Portrait preview set saved from local fallback" : "Generated five living portrait scenes");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Portrait generation failed");
+    } finally {
+      setPortraitBusy(false);
     }
   }
 
@@ -157,18 +232,56 @@ export function CompanionDashboard() {
     <main className="min-h-screen px-4 py-5 text-ink sm:px-6 lg:px-8">
       <section className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[320px_minmax(0,1fr)_320px]">
         <aside className="rounded-lg border border-black/10 bg-white/78 p-4 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-start justify-between gap-3">
             <div>
               <h1 className="text-2xl font-semibold">MyMate</h1>
               <p className="text-sm text-black/60">Persistent AI companions</p>
             </div>
-            <button onClick={logout} className="rounded-md bg-ink px-3 py-2 text-sm font-medium text-white disabled:opacity-60" disabled={busy}>
-              Log out
-            </button>
+            <div className="relative">
+              <button onClick={() => setProfileOpen((open) => !open)} className="rounded-full border border-black/10 bg-white p-2 text-ink shadow-sm" aria-label="Open profile menu">
+                <CircleUserRound className="h-5 w-5" />
+              </button>
+              {profileOpen && (
+                <div className="absolute right-0 top-11 z-30 w-72 rounded-lg border border-black/10 bg-white p-3 shadow-lg">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <div className="text-sm font-semibold">Your profile</div>
+                      <div className="text-xs text-black/50">Personalize your space</div>
+                    </div>
+                    <button onClick={() => setProfileOpen(false)} className="rounded p-1 text-black/50 hover:bg-paper" aria-label="Close profile menu"><X className="h-4 w-4" /></button>
+                  </div>
+                  <div className="mt-3">
+                    <label className="text-xs font-medium text-black/55">Display name</label>
+                    {profileEditing ? (
+                      <input value={profileName} onChange={(event) => setProfileName(event.target.value)} className="mt-1 w-full rounded-md border border-black/10 px-2 py-2 text-sm" placeholder="Your name" autoFocus />
+                    ) : (
+                      <div className="mt-1 rounded-md bg-paper px-2 py-2 text-sm">{profileName || "Add your name"}</div>
+                    )}
+                  </div>
+                  <div className="mt-2 rounded-md bg-paper px-2 py-2">
+                    <div className="text-[11px] font-medium uppercase tracking-wide text-black/45">Wallet</div>
+                    <div className="mt-0.5 truncate text-xs text-black/65">{wallet}</div>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    {profileEditing ? (
+                      <button onClick={saveProfile} disabled={profileBusy} className="flex flex-1 items-center justify-center gap-1 rounded-md bg-ink px-2 py-2 text-sm font-medium text-white disabled:opacity-50"><Save className="h-4 w-4" /> Save</button>
+                    ) : (
+                      <button onClick={() => setProfileEditing(true)} className="flex flex-1 items-center justify-center gap-1 rounded-md border border-black/10 px-2 py-2 text-sm"><Pencil className="h-4 w-4" /> Edit</button>
+                    )}
+                    <button onClick={() => { setShowCompanionForm(true); setProfileOpen(false); }} className="flex flex-1 items-center justify-center gap-1 rounded-md border border-black/10 px-2 py-2 text-sm"><Plus className="h-4 w-4" /> Companion</button>
+                  </div>
+                  <button onClick={logout} className="mt-2 w-full rounded-md px-2 py-2 text-sm text-black/60 hover:bg-paper">Log out</button>
+                </div>
+              )}
+            </div>
           </div>
           <div className="mt-3 truncate rounded-md bg-paper px-3 py-2 text-xs text-black/55">{wallet || "Privy account active"}</div>
 
-          <div className="mt-5 space-y-3">
+          {(companions.length === 0 || showCompanionForm) && <div className="mt-5 space-y-3 rounded-lg border border-black/10 bg-white/60 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-semibold">Create companion</div>
+              {companions.length > 0 && <button onClick={() => setShowCompanionForm(false)} className="rounded p-1 text-black/50 hover:bg-paper" aria-label="Close companion form"><X className="h-4 w-4" /></button>}
+            </div>
             <input value={name} onChange={(event) => setName(event.target.value)} className="w-full rounded-md border border-black/10 bg-white px-3 py-2" placeholder="Companion name" />
             <div className="grid grid-cols-2 gap-2">
               {(Object.keys(companionArchetypes) as CompanionType[]).map((key) => (
@@ -181,7 +294,7 @@ export function CompanionDashboard() {
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
               Create companion
             </button>
-          </div>
+          </div>}
 
           <div className="mt-5 space-y-2">
             {companions.map((companion) => (
@@ -196,7 +309,7 @@ export function CompanionDashboard() {
         </aside>
 
         <section className="overflow-hidden rounded-lg border border-black/10 bg-white/82 shadow-sm">
-          <div className="avatar-stage relative min-h-[240px] border-b border-black/10 p-5">
+          <div className="avatar-stage relative min-h-[360px] border-b border-black/10 p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="text-sm font-medium text-black/55">{activeTypeLabel} / {archetype.background}</div>
@@ -204,22 +317,18 @@ export function CompanionDashboard() {
                 <p className="mt-2 max-w-xl text-sm text-black/65">{archetype.evolution}</p>
               </div>
               {active && (
-                <button onClick={createSnapshot} className="rounded-md border border-black/10 bg-white px-3 py-2 text-sm">
-                  <Archive className="inline h-4 w-4" /> Snapshot
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={generatePortrait} disabled={portraitBusy} className="rounded-md border border-black/10 bg-white px-3 py-2 text-sm disabled:opacity-50">
+                    {portraitBusy ? <Loader2 className="inline h-4 w-4 animate-spin" /> : <ImageUp className="inline h-4 w-4" />} Portrait set
+                  </button>
+                  <button onClick={createSnapshot} className="rounded-md border border-black/10 bg-white px-3 py-2 text-sm">
+                    <Archive className="inline h-4 w-4" /> Snapshot
+                  </button>
+                </div>
               )}
             </div>
-            <div className="mx-auto mt-6 grid h-36 w-36 place-items-center rounded-full border-4 border-white text-center shadow-lg" style={{ backgroundColor: archetype.accent }}>
-              <div className="text-white">
-                {active?.avatarImage ? (
-                  <img src={active.avatarImage} alt={`${active.name} avatar`} className="mx-auto h-24 w-24 rounded-full object-cover" />
-                ) : (
-                  <>
-                    <Sparkles className="mx-auto h-8 w-8" />
-                    <div className="mt-2 text-xl font-semibold">{active?.avatarKey ?? (active?.evolutionStage === 2 ? archetype.stageTwoAvatar : archetype.stageOneAvatar)}</div>
-                  </>
-                )}
-              </div>
+            <div className="mx-auto mt-6 grid min-h-64 max-w-sm place-items-end">
+              <CompanionPortrait companion={active} accent={archetype.accent} fallbackLabel={active?.avatarKey ?? (active?.evolutionStage === 2 ? archetype.stageTwoAvatar : archetype.stageOneAvatar)} visualState={portraitState} activityState={portraitActivity} />
             </div>
           </div>
 
@@ -227,8 +336,18 @@ export function CompanionDashboard() {
             {messages.length === 0 && <p className="text-sm text-black/55">Start a conversation. Your companion will save meaningful memories as you talk.</p>}
             {messages.map((chat) => (
               <div key={chat.id} className="space-y-2">
-                <div className="ml-auto max-w-[78%] rounded-lg bg-ink px-3 py-2 text-sm text-white">{chat.userMessage}</div>
-                <div className="max-w-[78%] rounded-lg bg-paper px-3 py-2 text-sm">{chat.companionResponse}</div>
+                <div className="flex items-start justify-end gap-2">
+                  <div className="chat-bubble chat-bubble--user max-w-[78%] rounded-lg bg-ink px-3 py-2 text-sm text-white">
+                    {chat.userMessage}
+                  </div>
+                  <MessageAvatar label={profileName || "You"} kind="user" />
+                </div>
+                <div className="flex items-start gap-2">
+                  <MessageAvatar label={active?.name ?? "Companion"} image={active?.generatedPortrait || active?.avatarImage} kind="companion" />
+                  <div className="chat-bubble chat-bubble--companion max-w-[78%] rounded-lg bg-paper px-3 py-2 text-sm">
+                    {chat.companionResponse}
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -296,6 +415,44 @@ function Metric({ label, value }: { label: string; value: number | string }) {
     <div className="rounded-md bg-paper p-3">
       <div className="text-xs text-black/50">{label}</div>
       <div className="text-xl font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function MessageAvatar({ label, image, kind }: { label: string; image?: string | null; kind: "user" | "companion" }) {
+  if (image) {
+    return <img src={image} alt={`${label} avatar`} className="mt-0.5 h-8 w-8 shrink-0 rounded-full border-2 border-white object-cover shadow-sm" />;
+  }
+
+  return (
+    <div className={cn("mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full border-2 border-white text-xs font-semibold text-white shadow-sm", kind === "user" ? "bg-ember" : "bg-mint")} aria-label={`${label} avatar`} title={label}>
+      {kind === "user" ? label.slice(0, 1).toUpperCase() : <Bot className="h-4 w-4" />}
+    </div>
+  );
+}
+
+function CompanionPortrait({ companion, accent, fallbackLabel, visualState, activityState }: { companion?: Companion; accent: string; fallbackLabel: string; visualState: PortraitVisualState; activityState: PortraitActivityState }) {
+  const image = companion?.portraitVariants?.[visualState] || companion?.generatedPortrait || companion?.avatarImage;
+  const direction = portraitDirections[visualState];
+
+  if (image) {
+    return (
+      <div className="relative grid min-h-64 w-full place-items-end overflow-hidden rounded-lg bg-white/45 px-6 pt-6 shadow-inner">
+        <div className="absolute inset-x-4 top-4 z-10 flex items-center justify-between text-xs font-medium text-black/55">
+          <span className="rounded-full bg-white/80 px-2 py-1">{direction.label}</span>
+          <span className="rounded-full bg-white/80 px-2 py-1 capitalize">{activityState}</span>
+        </div>
+        <img key={`${companion?.id}-${visualState}`} src={image} alt={`${companion?.name ?? "Companion"}, ${direction.label.toLowerCase()} scene`} className={cn("living-portrait max-h-72 w-auto object-contain drop-shadow-xl", `living-portrait--${activityState}`)} />
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("living-portrait grid h-56 w-56 place-items-center rounded-full border-4 border-white text-center shadow-lg", `living-portrait--${activityState}`)} style={{ backgroundColor: accent }}>
+      <div className="text-white">
+        <Sparkles className="mx-auto h-10 w-10" />
+        <div className="mt-2 text-xl font-semibold">{fallbackLabel}</div>
+      </div>
     </div>
   );
 }

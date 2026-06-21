@@ -7,6 +7,7 @@ import { evolutionStageFor, levelFromXp, moodAfterInteraction, nextRelationshipS
 import { jsonError, parseJson, walletFromRequest } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
+import { selectPortraitState } from "@/lib/companion/portrait-state";
 
 const schema = z.object({ message: z.string().min(1).max(1200) });
 
@@ -85,7 +86,12 @@ export async function POST(request: Request, context: { params: Promise<{ compan
       });
     });
 
-    return NextResponse.json({ response, companion: updated, memoriesCreated: memoryCandidates.length });
+    return NextResponse.json({
+      response,
+      companion: updated,
+      memoriesCreated: memoryCandidates.length,
+      portraitState: selectPortraitState(body.message, response)
+    });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Unable to chat with companion");
   }

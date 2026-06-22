@@ -5,23 +5,118 @@ export type ChatMessage = {
   content: string;
 };
 
-export async function generateCompanionReply(messages: ChatMessage[]) {
-  const apiKey = process.env.LLM_API_KEY;
-  if (!apiKey) return fallbackReply(messages);
+type AiProvider = "openai" | "0g";
 
+type ProviderConfig = {
+  provider: AiProvider;
+  apiKey?: string;
+  baseURL: string;
+  model: string;
+  trustMode?: "private";
+  verifyTee?: boolean;
+};
+
+const ZERO_G_ROUTER_URL = "https://router-api.0g.ai/v1";
+const ZERO_G_DEFAULT_MODEL = "0gm-1.0-35b-a3b";
+
+export function isLlmConfigured() {
+  return Boolean(providerConfig(activeProvider()).apiKey);
+}
+
+export async function generateCompanionReply(messages: ChatMessage[]) {
+  const provider = activeProvider();
+  const config = providerConfig(provider);
+  if (!config.apiKey) return fallbackReply(messages);
+
+  try {
+    return await generateReply(config, messages);
+  } catch (error) {
+    if (error instanceof TeeVerificationError) {
+      console.error(error.message);
+      return fallbackReply(messages);
+    }
+
+    const fallbackProvider = fallbackAiProvider(provider);
+    const fallbackConfig = fallbackProvider ? providerConfig(fallbackProvider) : null;
+
+    if (fallbackConfig?.apiKey) {
+      try {
+        return await generateReply(fallbackConfig, messages);
+      } catch {
+        // Return the local reply below when both configured providers are unavailable.
+      }
+    }
+
+    console.error(`AI reply generation failed with ${provider}`, error);
+    return fallbackReply(messages);
+  }
+}
+
+async function generateReply(config: ProviderConfig, messages: ChatMessage[]) {
   const client = new OpenAI({
-    apiKey,
-    baseURL: process.env.LLM_BASE_URL || "https://api.openai.com/v1"
+    apiKey: config.apiKey,
+    baseURL: config.baseURL,
+    defaultHeaders: config.trustMode ? { "X-0G-Provider-Trust-Mode": config.trustMode } : undefined
   });
 
-  const response = await client.chat.completions.create({
-    model: process.env.LLM_MODEL || "gpt-4o-mini",
+  const request = {
+    model: config.model,
     messages,
     temperature: 0.8,
-    max_tokens: 260
-  });
+    max_tokens: 260,
+    ...(config.verifyTee ? { verify_tee: true } : {})
+  };
+  const response = await client.chat.completions.create(request);
+
+  if (config.verifyTee && !teeWasVerified(response)) {
+    throw new TeeVerificationError("0G did not return a verified TEE trace for this response");
+  }
 
   return response.choices[0]?.message.content?.trim() || fallbackReply(messages);
+}
+
+function activeProvider(): AiProvider {
+  return process.env.AI_PROVIDER?.trim().toLowerCase() === "0g" ? "0g" : "openai";
+}
+
+function fallbackAiProvider(active: AiProvider): AiProvider | null {
+  const configured = process.env.AI_FALLBACK_PROVIDER?.trim().toLowerCase();
+  if (configured === "openai" && active !== "openai") return "openai";
+  if (configured === "0g" && active !== "0g") return "0g";
+  return null;
+}
+
+function providerConfig(provider: AiProvider): ProviderConfig {
+  if (provider === "0g") {
+    return {
+      provider,
+      apiKey: process.env.ZERO_G_COMPUTE_API_KEY,
+      baseURL: process.env.ZERO_G_COMPUTE_BASE_URL || ZERO_G_ROUTER_URL,
+      model: process.env.ZERO_G_COMPUTE_MODEL || ZERO_G_DEFAULT_MODEL,
+      trustMode: process.env.ZERO_G_COMPUTE_TRUST_MODE?.toLowerCase() === "disabled" ? undefined : "private",
+      verifyTee: process.env.ZERO_G_COMPUTE_VERIFY_TEE?.toLowerCase() !== "false"
+    };
+  }
+
+  return {
+    provider,
+    apiKey: process.env.LLM_API_KEY,
+    baseURL: process.env.LLM_BASE_URL || "https://api.openai.com/v1",
+    model: process.env.LLM_MODEL || "gpt-4o-mini"
+  };
+}
+
+function teeWasVerified(response: unknown) {
+  if (!response || typeof response !== "object") return false;
+  const trace = (response as { trace?: unknown }).trace;
+  return Boolean(trace && typeof trace === "object" && (trace as { tee_verified?: unknown }).tee_verified === true);
+}
+
+class TeeVerificationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TeeVerificationError";
+  }
 }
 
 function fallbackReply(messages: ChatMessage[]) {

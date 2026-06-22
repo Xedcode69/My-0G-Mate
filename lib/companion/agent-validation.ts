@@ -1,4 +1,4 @@
-import { generateCompanionReply } from "@/lib/ai/llm";
+import { generateCompanionReply, isLlmConfigured } from "@/lib/ai/llm";
 import { workflowDefinitionsForAgent } from "@/lib/companion/agent-templates";
 
 export type AgentDefinition = {
@@ -36,7 +36,7 @@ const blockedPatterns = /\b(malware|ransomware|credential theft|steal passwords|
 
 export async function validateCustomAgent(definition: AgentDefinition): Promise<AgentValidation> {
   const local = validateLocally(definition);
-  if (local.status === "BLOCKED" || local.status === "NEEDS_REFINEMENT" || !process.env.LLM_API_KEY) return local;
+  if (local.status === "BLOCKED" || local.status === "NEEDS_REFINEMENT" || !isLlmConfigured()) return local;
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {

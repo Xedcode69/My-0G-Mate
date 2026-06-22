@@ -133,12 +133,20 @@ export function actionsForAgent(agent?: { templateId?: string | null; role?: str
     ];
   }
 
-  return template?.actions ?? [{ type: "DAILY_CHECK_IN", label: "Check focus" }, { type: "REFLECTION_PROMPT", label: "Review progress" }];
+  return roleDerivedActions(agent);
+}
+
+function roleDerivedActions(agent?: { role?: string | null; scope?: string[] | null }): AgentAction[] {
+  const role = agent?.role?.trim() || "specialist";
+  return [
+    { type: "DAILY_CHECK_IN", label: `Create ${role} brief` },
+    { type: "REFLECTION_PROMPT", label: `Build ${role} action plan` }
+  ];
 }
 
 export function workflowDefinitionsForAgent(agent?: { templateId?: string | null; role?: string | null; scope?: string[] | null }) {
   return actionsForAgent(agent).map((action, index) => {
-    const detail = workflowDetail(action.label, agent?.role || "specialist agent");
+    const detail = workflowDetail(action.label, agent?.role || "specialist agent", agent?.scope ?? []);
     return {
       key: action.label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""),
       label: action.label,
@@ -153,7 +161,7 @@ export function workflowDefinitionsForAgent(agent?: { templateId?: string | null
   });
 }
 
-function workflowDetail(label: string, role: string) {
+function workflowDetail(label: string, role: string, scope: string[]) {
   const defaults = {
     description: `Work with your ${role} on a focused next step.`,
     starterQuestion: `What would you like to accomplish through this ${label.toLowerCase()} workflow?`,
@@ -162,6 +170,31 @@ function workflowDetail(label: string, role: string) {
     completionCriteria: "A clear outcome and next step have been agreed with the user.",
     safetyConstraints: ["Be transparent about uncertainty", "Do not claim external actions were performed"]
   };
+  const normalizedLabel = label.toLowerCase();
+  const scopeContext = scope.length ? scope.slice(0, 2) : ["the user's stated goal"];
+
+  if (normalizedLabel.endsWith(" brief")) {
+    return {
+      description: `Clarify the user's objective, context, and constraints before the ${role} begins focused work.`,
+      starterQuestion: `What would you like your ${role} to help with today, and what outcome would make this useful?`,
+      workflowInstructions: "Ask one focused question at a time to understand the objective, relevant context, constraints, and desired outcome. Summarize the resulting brief and ask the user to confirm it before continuing.",
+      requiredInformation: ["user objective", "current context", "desired outcome", "constraints", ...scopeContext],
+      completionCriteria: "The user has confirmed a clear brief for the agent to act on.",
+      safetyConstraints: ["Stay within the approved role and scope", "Be transparent about uncertainty", "Do not claim external actions were performed"]
+    };
+  }
+
+  if (normalizedLabel.endsWith(" action plan")) {
+    return {
+      description: `Turn an approved brief into a practical, role-appropriate action plan with the ${role}.`,
+      starterQuestion: `What should we prioritize first, and what constraints or deadline should shape this ${role} action plan?`,
+      workflowInstructions: "Use the user's confirmed objective to identify priorities, options, constraints, and a practical first step. Present a concise plan, state assumptions, and ask the user to approve or refine it.",
+      requiredInformation: ["confirmed objective", "priorities", "constraints", "timeframe", ...scopeContext],
+      completionCriteria: "The user has approved an actionable plan and a concrete next step.",
+      safetyConstraints: ["Stay within the approved role and scope", "Be transparent about uncertainty", "Do not claim external actions were performed"]
+    };
+  }
+
   const specifics: Record<string, typeof defaults> = {
     "Generate fitness plan": {
       description: "Build a sustainable, personalized fitness plan through a guided conversation.",

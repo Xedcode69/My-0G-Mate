@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Archive, Bot, Brain, CircleUserRound, Heart, ImageUp, Loader2, MessageCircle, MessageSquarePlus, Pencil, Plus, Save, Sparkles, ThumbsDown, ThumbsUp, X } from "lucide-react";
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { companionArchetypes, moodLabels, relationshipLabels } from "@/lib/companion/archetypes";
 import { defaultAgentTemplate } from "@/lib/companion/agent-templates";
 import { portraitDirections, selectPortraitState, type PortraitActivityState, type PortraitVisualState } from "@/lib/companion/portrait-state";
 import type { StructuredResult } from "@/lib/companion/structured-output";
+import { companionRegistryConfig, registerCompanionOnchain } from "@/lib/blockchain/companion-registry";
 import { cn } from "@/lib/ui";
 
 type CompanionType = "ROBOT" | "PET" | "ANIME_GIRL" | "SPIRIT" | "CUSTOM";
@@ -18,6 +19,7 @@ type WorkflowAction = { id: string; label: string; description: string; starterQ
 
 type Companion = {
   id: string;
+  blockchainId?: string | null;
   name: string;
   type: CompanionType;
   avatarKey: string;
@@ -39,6 +41,7 @@ type Companion = {
 
 export function CompanionDashboard() {
   const { logout, user } = usePrivy();
+  const { wallets } = useWallets();
   const router = useRouter();
   const [companions, setCompanions] = useState<Companion[]>([]);
   const [activeId, setActiveId] = useState("");
@@ -188,6 +191,27 @@ export function CompanionDashboard() {
       setStatus(error instanceof Error ? error.message : "Unable to regenerate workflows");
     } finally {
       setWorkflowBusy(false);
+    }
+  }
+
+  async function registerActiveCompanionOnchain() {
+    if (!active || !companionRegistryConfig()) return;
+    const signingWallet = wallets.find((candidate) => candidate.address.toLowerCase() === wallet);
+    if (!signingWallet) {
+      setStatus("Your connected wallet is unavailable for 0G registration");
+      return;
+    }
+    setBusy(true);
+    try {
+      const provider = await signingWallet.getEthereumProvider();
+      const registration = await registerCompanionOnchain(provider, active.customTypeName || activeTypeLabel);
+      const data = await request<{ companion: { blockchainId: string } }>(`/api/companions/${active.id}/chain`, { method: "PATCH", body: JSON.stringify({ blockchainId: registration.companionId }) });
+      setCompanions((current) => current.map((companion) => companion.id === active.id ? { ...companion, blockchainId: data.companion.blockchainId } : companion));
+      setStatus("Companion ownership registered on 0G mainnet");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Unable to register companion on 0G mainnet");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -344,6 +368,7 @@ export function CompanionDashboard() {
                 </div>
                 {profileEditing && <button onClick={saveProfile} disabled={profileBusy} className="flex w-full items-center justify-center gap-2 rounded-lg bg-ink px-3 py-2.5 text-sm font-medium text-white disabled:opacity-50"><Save className="h-4 w-4" /> Save changes</button>}
                 <button onClick={() => { setProfileOpen(false); router.push("/onboarding"); }} className="flex w-full items-center justify-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2.5 text-sm font-medium hover:bg-paper"><Plus className="h-4 w-4" /> Add companion</button>
+                {active && !active.blockchainId && companionRegistryConfig() && <button onClick={() => void registerActiveCompanionOnchain()} disabled={busy} className="w-full rounded-lg border border-black/10 bg-white px-3 py-2.5 text-sm font-medium hover:bg-paper disabled:opacity-50">Register {active.name} on 0G</button>}
                 <button onClick={logout} className="w-full rounded-lg px-3 py-2 text-sm text-black/55 hover:bg-paper hover:text-ink">Log out</button>
               </div>
             </div>

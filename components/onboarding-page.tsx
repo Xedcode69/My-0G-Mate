@@ -2,11 +2,12 @@
 
 import { ChangeEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { Bot, Cat, Check, ImageUp, Loader2, Plus, Sparkles, UserRound } from "lucide-react";
 import { companionArchetypes } from "@/lib/companion/archetypes";
 import { agentTemplates, defaultAgentTemplate } from "@/lib/companion/agent-templates";
 import type { AgentValidation } from "@/lib/companion/agent-validation";
+import { companionRegistryConfig, registerCompanionOnchain } from "@/lib/blockchain/companion-registry";
 import { StarterPage } from "@/components/starter-page";
 import { cn } from "@/lib/ui";
 
@@ -57,6 +58,7 @@ const interestOptions = [
 
 export function OnboardingPage() {
   const { authenticated, ready, user } = usePrivy();
+  const { wallets } = useWallets();
   const router = useRouter();
   const [name, setName] = useState("Nova");
   const [type, setType] = useState<CompanionType>("ROBOT");
@@ -132,6 +134,24 @@ export function OnboardingPage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Unable to create companion");
+      if (companionRegistryConfig()) {
+        try {
+          const signingWallet = wallets.find((candidate) => candidate.address.toLowerCase() === wallet);
+          if (!signingWallet) throw new Error("Your connected wallet is unavailable for 0G registration");
+          setStatus("Approve the 0G mainnet transaction to register your companion…");
+          const provider = await signingWallet.getEthereumProvider();
+          const registration = await registerCompanionOnchain(provider, selectedTypeLabel);
+          const chainResponse = await fetch(`/api/companions/${data.companion.id}/chain`, {
+            method: "PATCH",
+            headers: { "content-type": "application/json", "x-wallet-address": wallet },
+            body: JSON.stringify({ blockchainId: registration.companionId })
+          });
+          const chainData = await chainResponse.json();
+          if (!chainResponse.ok) throw new Error(chainData.error ?? "Companion was created but could not be linked on-chain");
+        } catch {
+          // The companion remains usable and can be registered from the profile menu later.
+        }
+      }
       router.replace("/");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Unable to create companion");

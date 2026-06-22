@@ -41,15 +41,12 @@ export function CompanionDashboard() {
   const router = useRouter();
   const [companions, setCompanions] = useState<Companion[]>([]);
   const [activeId, setActiveId] = useState("");
-  const [name, setName] = useState("Nova");
-  const [type, setType] = useState<CompanionType>("ROBOT");
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const [portraitBusy, setPortraitBusy] = useState(false);
   const [portraitState, setPortraitState] = useState<PortraitVisualState>("supportive");
   const [portraitActivity, setPortraitActivity] = useState<PortraitActivityState>("idle");
-  const [showCompanionForm, setShowCompanionForm] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileEditing, setProfileEditing] = useState(false);
   const [profileName, setProfileName] = useState("");
@@ -64,7 +61,7 @@ export function CompanionDashboard() {
   const wallet = user?.wallet?.address?.toLowerCase() ?? "";
 
   const active = companions.find((companion) => companion.id === activeId) ?? companions[0];
-  const archetype = active ? companionArchetypes[active.type] : companionArchetypes[type];
+  const archetype = active ? companionArchetypes[active.type] : companionArchetypes.ROBOT;
   const activeTypeLabel = active?.customTypeName || archetype.label;
   const agentActionLabel = active?.agentProfile?.role || defaultAgentTemplate.label;
   const messages = useMemo(() => [...(active?.chatLogs ?? [])].reverse(), [active?.chatLogs]);
@@ -215,24 +212,6 @@ export function CompanionDashboard() {
     }
   }
 
-  async function createCompanion() {
-    setBusy(true);
-    try {
-      const data = await request<{ companion: Companion }>("/api/companions", {
-        method: "POST",
-        body: JSON.stringify({ name, type, avatarKey: `${type.toLowerCase()}-default` })
-      });
-      setCompanions((current) => [data.companion, ...current]);
-      setActiveId(data.companion.id);
-      setShowCompanionForm(false);
-      setStatus(`${data.companion.name} joined you`);
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Unable to create companion");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function sendMessage() {
     if (!active || !message.trim()) return;
     const userMessage = message;
@@ -349,7 +328,7 @@ export function CompanionDashboard() {
                   <div className="truncate rounded-lg border border-black/10 bg-white px-3 py-2 font-mono text-xs text-black/60">{wallet}</div>
                 </div>
                 {profileEditing && <button onClick={saveProfile} disabled={profileBusy} className="flex w-full items-center justify-center gap-2 rounded-lg bg-ink px-3 py-2.5 text-sm font-medium text-white disabled:opacity-50"><Save className="h-4 w-4" /> Save changes</button>}
-                <button onClick={() => { setShowCompanionForm(true); setProfileOpen(false); }} className="flex w-full items-center justify-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2.5 text-sm font-medium hover:bg-paper"><Plus className="h-4 w-4" /> Add companion</button>
+                <button onClick={() => { setProfileOpen(false); router.push("/onboarding"); }} className="flex w-full items-center justify-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2.5 text-sm font-medium hover:bg-paper"><Plus className="h-4 w-4" /> Add companion</button>
                 <button onClick={logout} className="w-full rounded-lg px-3 py-2 text-sm text-black/55 hover:bg-paper hover:text-ink">Log out</button>
               </div>
             </div>
@@ -366,25 +345,6 @@ export function CompanionDashboard() {
             </div>
             <span className="rounded-full bg-paper px-2 py-1 text-xs font-medium text-black/55">{companions.length}</span>
           </div>
-
-          {(companions.length === 0 || showCompanionForm) && <div className="mt-5 space-y-3 rounded-lg border border-black/10 bg-white/60 p-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-sm font-semibold">Create companion</div>
-              {companions.length > 0 && <button onClick={() => setShowCompanionForm(false)} className="rounded p-1 text-black/50 hover:bg-paper" aria-label="Close companion form"><X className="h-4 w-4" /></button>}
-            </div>
-            <input value={name} onChange={(event) => setName(event.target.value)} className="w-full rounded-md border border-black/10 bg-white px-3 py-2" placeholder="Companion name" />
-            <div className="grid grid-cols-2 gap-2">
-              {(Object.keys(companionArchetypes) as CompanionType[]).map((key) => (
-                <button key={key} onClick={() => setType(key)} className={cn("rounded-md border px-3 py-2 text-left text-sm", type === key ? "border-ink bg-ink text-white" : "border-black/10 bg-white")}>
-                  {companionArchetypes[key].label}
-                </button>
-              ))}
-            </div>
-            <button onClick={createCompanion} disabled={!wallet || busy} className="flex w-full items-center justify-center gap-2 rounded-md bg-ember px-3 py-2 font-medium text-white disabled:opacity-50">
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
-              Create companion
-            </button>
-          </div>}
 
           <div className="mt-4">
             <div className="space-y-1.5">

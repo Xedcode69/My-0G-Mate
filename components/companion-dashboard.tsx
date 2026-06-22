@@ -176,6 +176,20 @@ export function CompanionDashboard() {
     }
   }
 
+  async function regenerateWorkflowActions() {
+    if (!active) return;
+    setWorkflowBusy(true);
+    try {
+      const data = await request<{ actions: WorkflowAction[] }>(`/api/companions/${active.id}/actions/regenerate`, { method: "POST" });
+      setWorkflowActions(data.actions);
+      setStatus("Role-specific workflows regenerated");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Unable to regenerate workflows");
+    } finally {
+      setWorkflowBusy(false);
+    }
+  }
+
   async function saveProfile() {
     if (profileName.trim().length < 2) {
       setStatus("Profile name must be at least 2 characters");
@@ -480,7 +494,8 @@ export function CompanionDashboard() {
           </div>
 
           <div className="rounded-xl bg-white/72 p-4 shadow-[0_8px_28px_rgba(20,21,26,0.05)]">
-            <div className="flex items-center justify-between"><h3 className="font-semibold">Agent actions</h3><span className="text-xs text-black/45">{agentActionLabel}</span></div>
+            <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">Agent actions</h3><button onClick={() => void regenerateWorkflowActions()} disabled={!active || workflowBusy} className="text-xs font-medium text-black/50 hover:text-ink disabled:opacity-50" title="Regenerate workflows for this role">Regenerate</button></div>
+            <div className="mt-0.5 text-xs text-black/45">{agentActionLabel}</div>
             <div className="mt-3 grid grid-cols-2 gap-2">
               {workflowActions.map((action) => <button key={action.id} onClick={() => void startWorkflow(action)} disabled={!active || workflowBusy} className="rounded-lg border border-black/10 bg-white p-3 text-left text-sm transition-colors hover:bg-paper disabled:opacity-50">
                 <div className="flex items-center gap-2 font-medium"><Sparkles className="h-4 w-4 shrink-0 text-ember" /> {action.label}</div>

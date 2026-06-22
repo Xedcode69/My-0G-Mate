@@ -38,19 +38,23 @@ export async function validateCustomAgent(definition: AgentDefinition): Promise<
   const local = validateLocally(definition);
   if (local.status === "BLOCKED" || local.status === "NEEDS_REFINEMENT" || !process.env.LLM_API_KEY) return local;
 
-  try {
-    const response = await generateCompanionReply([
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await generateCompanionReply([
       {
         role: "system",
-        content: "You validate user-created AI agent definitions. Return JSON only with status (APPROVED, NEEDS_REFINEMENT, or BLOCKED), reason, suggestedRole, suggestedMission, suggestedScope (string array), suggestedBoundaries (string array), and suggestedActions (array of 3 to 5 objects). Each suggested action object must have key, label, description, starterQuestion, workflowInstructions, requiredInformation (string array), completionCriteria, and safetyConstraints (string array). Approve creative and niche roles when their mission and scope are coherent. Mark NEEDS_REFINEMENT only when focus is unclear or contradictory. Block only clearly harmful or illegal assistance. Suggested actions must be concrete guided workflows within the role's scope; do not add capabilities the user did not request. Include appropriate high-stakes safety constraints."
+        content: "You validate user-created AI agent definitions. Return JSON only with status (APPROVED, NEEDS_REFINEMENT, or BLOCKED), reason, suggestedRole, suggestedMission, suggestedScope (string array), suggestedBoundaries (string array), and suggestedActions (array of 3 to 5 objects). Each suggested action object must have key, label, description, starterQuestion, workflowInstructions, requiredInformation (string array), completionCriteria, and safetyConstraints (string array). Approve creative and niche roles when their mission and scope are coherent. Mark NEEDS_REFINEMENT only when focus is unclear or contradictory. Block only clearly harmful or illegal assistance. Suggested actions must be concrete guided workflows within the role's scope; do not add capabilities the user did not request. Every action must explicitly use a domain noun from the role, mission, or scope in its label and description. Never suggest generic actions such as 'Check focus', 'Review progress', 'Get started', or 'Plan next step' for a specialized agent. For a music role, suggest workflows such as music discovery, chart exploration, lyric lookup, artist research, or playlist curation. Include appropriate high-stakes safety constraints."
       },
       { role: "user", content: JSON.stringify(definition) }
-    ]);
-    const parsed = parseValidation(response);
-    return parsed ?? local;
-  } catch {
-    return local;
+      ]);
+      const parsed = parseValidation(response);
+      if (parsed && (parsed.status !== "APPROVED" || actionsMatchDefinition(parsed.suggestedActions, definition))) return parsed;
+    } catch {
+      // Fall through to the deterministic result below.
+    }
   }
+
+  return local;
 }
 
 function validateLocally(definition: AgentDefinition): AgentValidation {
@@ -109,3 +113,19 @@ function validActions(value: unknown): value is SuggestedAgentAction[] {
     return ["key", "label", "description", "starterQuestion", "workflowInstructions", "completionCriteria"].every((field) => typeof item[field] === "string" && item[field]) && Array.isArray(item.requiredInformation) && Array.isArray(item.safetyConstraints);
   });
 }
+
+function actionsMatchDefinition(actions: SuggestedAgentAction[], definition: AgentDefinition) {
+  const definitionTerms = terms(`${definition.role} ${definition.mission} ${definition.scope.join(" ")}`);
+  const genericLabels = new Set(["check focus", "review progress", "get started", "plan next step"]);
+  if (actions.length < 2 || actions.some((action) => genericLabels.has(action.label.toLowerCase()))) return false;
+  return actions.every((action) => {
+    const actionTerms = terms(`${action.label} ${action.description} ${action.starterQuestion} ${action.requiredInformation.join(" ")}`);
+    return [...actionTerms].some((term) => definitionTerms.has(term));
+  });
+}
+
+function terms(value: string) {
+  return new Set(value.toLowerCase().match(/[a-z0-9]{3,}/g)?.filter((term) => !genericTerms.has(term)) ?? []);
+}
+
+const genericTerms = new Set(["about", "agent", "and", "are", "assistant", "build", "for", "from", "have", "help", "into", "mission", "role", "scope", "that", "the", "this", "user", "with", "your"]);

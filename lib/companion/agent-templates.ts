@@ -120,6 +120,12 @@ export function actionsForAgent(agent?: { templateId?: string | null; role?: str
       { type: "REFLECTION_PROMPT", label: "Review progress" }
     ];
   }
+  if (/\b(music|song|songs|artist|lyrics|playlist|album)\b/.test(focus)) {
+    return [
+      { type: "DAILY_CHECK_IN", label: "Discover music" },
+      { type: "REFLECTION_PROMPT", label: "Explore artist and lyrics" }
+    ];
+  }
 
   return template?.actions ?? [{ type: "DAILY_CHECK_IN", label: "Check focus" }, { type: "REFLECTION_PROMPT", label: "Review progress" }];
 }

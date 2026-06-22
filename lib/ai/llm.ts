@@ -18,6 +18,7 @@ type ProviderConfig = {
   apiKey?: string;
   baseURL: string;
   model: string;
+  maxTokens: number;
   trustMode?: "private";
   verifyTee?: boolean;
 };
@@ -69,7 +70,7 @@ async function generateReply(config: ProviderConfig, messages: ChatMessage[], op
     model: config.model,
     messages,
     temperature: options.temperature ?? 0.8,
-    max_tokens: options.maxTokens ?? 260,
+    max_tokens: options.maxTokens ?? config.maxTokens,
     ...(options.jsonObject ? { response_format: { type: "json_object" } } : {}),
     ...(config.verifyTee ? { verify_tee: true } : {})
   };
@@ -79,7 +80,20 @@ async function generateReply(config: ProviderConfig, messages: ChatMessage[], op
     throw new TeeVerificationError("0G did not return a verified TEE trace for this response");
   }
 
-  return response.choices[0]?.message.content?.trim() || fallbackReply(messages);
+  const content = response.choices[0]?.message.content?.trim();
+  if (content) return content;
+
+  if (process.env.NODE_ENV !== "production") {
+    const message = response.choices[0]?.message as unknown as Record<string, unknown> | undefined;
+    console.warn("AI provider returned no usable message content", {
+      provider: config.provider,
+      choiceCount: response.choices.length,
+      messageFields: message ? Object.keys(message) : [],
+      contentType: typeof message?.content,
+      reasoningLength: typeof message?.reasoning_content === "string" ? message.reasoning_content.length : 0
+    });
+  }
+  return fallbackReply(messages);
 }
 
 function activeProvider(): AiProvider {
@@ -100,6 +114,7 @@ function providerConfig(provider: AiProvider): ProviderConfig {
       apiKey: process.env.ZERO_G_COMPUTE_API_KEY,
       baseURL: process.env.ZERO_G_COMPUTE_BASE_URL || ZERO_G_ROUTER_URL,
       model: process.env.ZERO_G_COMPUTE_MODEL || ZERO_G_DEFAULT_MODEL,
+      maxTokens: positiveInteger(process.env.ZERO_G_COMPUTE_MAX_TOKENS, 4096),
       trustMode: process.env.ZERO_G_COMPUTE_TRUST_MODE?.toLowerCase() === "disabled" ? undefined : "private",
       verifyTee: process.env.ZERO_G_COMPUTE_VERIFY_TEE?.toLowerCase() !== "false"
     };
@@ -109,8 +124,14 @@ function providerConfig(provider: AiProvider): ProviderConfig {
     provider,
     apiKey: process.env.LLM_API_KEY,
     baseURL: process.env.LLM_BASE_URL || "https://api.openai.com/v1",
-    model: process.env.LLM_MODEL || "gpt-4o-mini"
+    model: process.env.LLM_MODEL || "gpt-4o-mini",
+    maxTokens: 260
   };
+}
+
+function positiveInteger(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function teeWasVerified(response: unknown) {
@@ -157,6 +178,19 @@ function fallbackReply(messages: ChatMessage[]) {
   const workflowInstruction = messages.find((message) => message.role === "system" && message.content.startsWith("An agent workflow has just started."))?.content;
   const openingQuestion = workflowInstruction?.match(/Start by asking this opening question, naturally and only once:\s*([\s\S]+)$/)?.[1]?.trim();
   if (openingQuestion) return openingQuestion;
+
+  const activeWorkflowInstruction = messages.find((message) => message.role === "system" && message.content.startsWith("Active workflow:"))?.content;
+  if (activeWorkflowInstruction) {
+    const label = activeWorkflowInstruction.match(/^Active workflow:\s*([^\.]+)\./)?.[1]?.trim() || "current";
+    const requiredInformation = activeWorkflowInstruction.match(/Required information still to clarify:\s*([\s\S]*?)\. Completion criteria:/)?.[1]
+      ?.split(",")
+      .map((item) => item.trim())
+      .filter(Boolean) ?? [];
+    const nextItem = requiredInformation[0];
+    return nextItem
+      ? `Let’s continue the ${label} workflow. Could you tell me about ${nextItem}?`
+      : `Let’s continue the ${label} workflow. What detail would you like to work through next?`;
+  }
 
   const userMessage = [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
   if (/learning|build|blockchain|code/i.test(userMessage)) {

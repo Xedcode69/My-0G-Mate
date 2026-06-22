@@ -72,6 +72,7 @@ export function CompanionDashboard() {
   const archetype = active ? companionArchetypes[active.type] : companionArchetypes.ROBOT;
   const activeTypeLabel = active?.customTypeName || archetype.label;
   const agentActionLabel = active?.agentProfile?.role || defaultAgentTemplate.label;
+  const browserRegistryConfig = companionRegistryConfig();
   const messages = useMemo(() => [...(active?.chatLogs ?? [])].reverse(), [active?.chatLogs]);
   const latestChat = active?.chatLogs?.[0];
   const recentTopic = conversationTopic(latestChat?.userMessage);
@@ -99,6 +100,13 @@ export function CompanionDashboard() {
 
   useEffect(() => {
     void loadChainStatus();
+  }, []);
+
+  useEffect(() => {
+    const registrationNotice = window.sessionStorage.getItem("mymate:onchain-registration-notice");
+    if (!registrationNotice) return;
+    window.sessionStorage.removeItem("mymate:onchain-registration-notice");
+    setStatus(registrationNotice);
   }, []);
 
   useEffect(() => {
@@ -431,14 +439,15 @@ export function CompanionDashboard() {
                   <div className="flex items-center justify-between"><span className="font-semibold text-black/65">0G status</span><span className={cn("rounded-full px-2 py-0.5", chainStatus?.registryStatus === "READY" ? "bg-mint/15 text-mint" : "bg-white text-black/50")}>{chainStatus?.registryStatus === "READY" ? "Ready" : "Setup needed"}</span></div>
                   <div className="mt-2 space-y-1 text-black/55">
                     <div>Registry: {active?.blockchainId ? `Companion #${active.blockchainId}` : "Not registered"}</div>
+                    {!active?.blockchainId && <div>Browser registration: {browserRegistryConfig ? "Available" : "Restart needed after public 0G configuration"}</div>}
                     <div>Archive: {archiveStatus?.snapshot ? `v${archiveStatus.snapshot.snapshotVersion}${archiveStatus.snapshot.anchoredAt ? " · anchored" : " · not anchored"}` : archiveStatus?.latestJob ? `Queued (${archiveStatus.latestJob.status.toLowerCase()})` : "None yet"}</div>
                     <div>Storage: {chainStatus?.storageConfigured ? "0G configured" : "Local fallback"}</div>
                   </div>
                 </div>
                 {profileEditing && <button onClick={saveProfile} disabled={profileBusy} className="flex w-full items-center justify-center gap-2 rounded-lg bg-ink px-3 py-2.5 text-sm font-medium text-white disabled:opacity-50"><Save className="h-4 w-4" /> Save changes</button>}
                 <button onClick={() => { setProfileOpen(false); router.push("/onboarding"); }} className="flex w-full items-center justify-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2.5 text-sm font-medium hover:bg-paper"><Plus className="h-4 w-4" /> Add companion</button>
-                {active && !active.blockchainId && companionRegistryConfig() && <button onClick={() => void registerActiveCompanionOnchain()} disabled={busy} className="w-full rounded-lg border border-black/10 bg-white px-3 py-2.5 text-sm font-medium hover:bg-paper disabled:opacity-50">Register {active.name} on 0G</button>}
-                {active?.blockchainId && companionRegistryConfig() && <button onClick={() => void syncLatestArchiveOnchain()} disabled={busy} className="w-full rounded-lg border border-black/10 bg-white px-3 py-2.5 text-sm font-medium hover:bg-paper disabled:opacity-50">Sync latest archive to 0G</button>}
+                {active && !active.blockchainId && <button onClick={() => void registerActiveCompanionOnchain()} disabled={busy || !browserRegistryConfig} title={browserRegistryConfig ? undefined : "Restart the app after setting NEXT_PUBLIC_COMPANION_REGISTRY_ADDRESS and NEXT_PUBLIC_ZERO_G_CHAIN_ID"} className="w-full rounded-lg border border-black/10 bg-white px-3 py-2.5 text-sm font-medium hover:bg-paper disabled:cursor-not-allowed disabled:opacity-50">{browserRegistryConfig ? `Register ${active.name} on 0G` : "Register on 0G (restart required)"}</button>}
+                {active?.blockchainId && browserRegistryConfig && <button onClick={() => void syncLatestArchiveOnchain()} disabled={busy} className="w-full rounded-lg border border-black/10 bg-white px-3 py-2.5 text-sm font-medium hover:bg-paper disabled:opacity-50">Sync latest archive to 0G</button>}
                 <button onClick={logout} className="w-full rounded-lg px-3 py-2 text-sm text-black/55 hover:bg-paper hover:text-ink">Log out</button>
               </div>
             </div>

@@ -148,8 +148,9 @@ export function OnboardingPage() {
           });
           const chainData = await chainResponse.json();
           if (!chainResponse.ok) throw new Error(chainData.error ?? "Companion was created but could not be linked on-chain");
-        } catch {
-          // The companion remains usable and can be registered from the profile menu later.
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : "Unable to request on-chain registration";
+          window.sessionStorage.setItem("mymate:onchain-registration-notice", `Companion created, but 0G registration needs attention: ${reason}`);
         }
       }
       router.replace("/");

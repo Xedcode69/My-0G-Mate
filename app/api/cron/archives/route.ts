@@ -1,7 +1,15 @@
 import { archiveCompanion } from "@/lib/companion/archive-processor";
 import { prisma } from "@/lib/prisma";
 
+export async function GET(request: Request) {
+  return processArchiveJobs(request);
+}
+
 export async function POST(request: Request) {
+  return processArchiveJobs(request);
+}
+
+async function processArchiveJobs(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) return new Response("Unauthorized", { status: 401 });
 

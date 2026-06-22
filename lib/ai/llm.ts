@@ -8,6 +8,7 @@ export type ChatMessage = {
 export type GenerateReplyOptions = {
   maxTokens?: number;
   temperature?: number;
+  jsonObject?: boolean;
 };
 
 type AiProvider = "openai" | "0g";
@@ -69,6 +70,7 @@ async function generateReply(config: ProviderConfig, messages: ChatMessage[], op
     messages,
     temperature: options.temperature ?? 0.8,
     max_tokens: options.maxTokens ?? 260,
+    ...(options.jsonObject ? { response_format: { type: "json_object" } } : {}),
     ...(config.verifyTee ? { verify_tee: true } : {})
   };
   const response = await client.chat.completions.create(request);

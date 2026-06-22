@@ -43,12 +43,22 @@ export async function validateCustomAgent(definition: AgentDefinition): Promise<
       const response = await generateCompanionReply([
       {
         role: "system",
-        content: "You validate user-created AI agent definitions. Return JSON only with status (APPROVED, NEEDS_REFINEMENT, or BLOCKED), reason, suggestedRole, suggestedMission, suggestedScope (string array), suggestedBoundaries (string array), and suggestedActions (array of 3 to 5 objects). Each suggested action object must have key, label, description, starterQuestion, workflowInstructions, requiredInformation (string array), completionCriteria, and safetyConstraints (string array). Approve creative and niche roles when their mission and scope are coherent. Mark NEEDS_REFINEMENT only when focus is unclear or contradictory. Block only clearly harmful or illegal assistance. Suggested actions must be concrete guided workflows within the role's scope; do not add capabilities the user did not request. Every action must explicitly use a domain noun from the role, mission, or scope in its label and description. Never suggest generic actions such as 'Check focus', 'Review progress', 'Get started', or 'Plan next step' for a specialized agent. For a music role, suggest workflows such as music discovery, chart exploration, lyric lookup, artist research, or playlist curation. Include appropriate high-stakes safety constraints."
+        content: "The server has already approved this custom AI agent definition. Generate only its distinct, concrete agent workflows. Return JSON only, with exactly this top-level shape: {\"suggestedActions\":[...]}. Return 2 to 4 action objects. Every action object must include key, label, description, starterQuestion, workflowInstructions, requiredInformation (a non-empty string array), completionCriteria, and safetyConstraints (a non-empty string array). Each workflow must directly serve the supplied role, mission, and scope and have a different user outcome. Include a domain noun from the role, mission, or scope in the label, description, and workflow instructions. Do not add capabilities outside the supplied definition. Never use generic workflows such as Check focus, Review progress, Get started, or Plan next step. Do not include Markdown, commentary, or fields other than suggestedActions. Example shape only: {\"suggestedActions\":[{\"key\":\"domain-workflow\",\"label\":\"Domain workflow\",\"description\":\"A concrete outcome for the supplied domain.\",\"starterQuestion\":\"What information should we begin with?\",\"workflowInstructions\":\"Collect the necessary context, propose a practical result, and ask for confirmation.\",\"requiredInformation\":[\"user objective\",\"constraints\"],\"completionCriteria\":\"The user has approved a useful result.\",\"safetyConstraints\":[\"State uncertainty clearly\"]}]}."
       },
       { role: "user", content: JSON.stringify(definition) }
-      ], { maxTokens: 1400, temperature: 0.2 });
-      const parsed = parseValidation(response);
-      if (parsed && (parsed.status !== "APPROVED" || actionsMatchDefinition(parsed.suggestedActions, definition))) return parsed;
+      ], { maxTokens: 2200, temperature: 0.2, jsonObject: true });
+      const parsedWorkflows = parseWorkflowSuggestions(response);
+      if (parsedWorkflows.actions && actionsMatchDefinition(parsedWorkflows.actions, definition)) {
+        return { ...local, suggestedActions: parsedWorkflows.actions };
+      }
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("Rejected model-suggested agent workflows", {
+          attempt: attempt + 1,
+          reason: !parsedWorkflows.actions ? parsedWorkflows.reason : "The workflows were generic, duplicated, or did not align with the role, mission, and scope",
+          actionCount: parsedWorkflows.actions?.length ?? 0,
+          responseShape: parsedWorkflows.shape
+        });
+      }
     } catch {
       // Fall through to the deterministic result below.
     }
@@ -93,35 +103,80 @@ function toValidation(definition: AgentDefinition): Omit<AgentValidation, "statu
   };
 }
 
-function parseValidation(value: string): AgentValidation | null {
-  const match = value.match(/\{[\s\S]*\}/);
-  if (!match) return null;
-  try {
-    const parsed = JSON.parse(match[0]) as Partial<AgentValidation>;
-    if (!parsed.status || !["APPROVED", "NEEDS_REFINEMENT", "BLOCKED"].includes(parsed.status) || !parsed.reason || !parsed.suggestedRole || !parsed.suggestedMission || !Array.isArray(parsed.suggestedScope) || !Array.isArray(parsed.suggestedBoundaries)) return null;
-    const fallbackActions = workflowDefinitionsForAgent({ templateId: "CUSTOM_AGENT", role: parsed.suggestedRole, scope: parsed.suggestedScope });
-    return { ...parsed, suggestedActions: validActions(parsed.suggestedActions) ? parsed.suggestedActions : fallbackActions } as AgentValidation;
-  } catch {
-    return null;
+type WorkflowParseResult = {
+  actions: SuggestedAgentAction[] | null;
+  reason: string;
+  shape: Record<string, unknown>;
+};
+
+function parseWorkflowSuggestions(value: string): WorkflowParseResult {
+  const candidates = [
+    value.trim().replace(/^```(?:json)?\s*|\s*```$/g, ""),
+    value.match(/\{[\s\S]*\}/)?.[0]
+  ].filter((candidate): candidate is string => Boolean(candidate));
+
+  let foundObject = false;
+  let latestShape: Record<string, unknown> = {
+    contentLength: value.length,
+    beginsWith: value.trim().slice(0, 1) || "empty",
+    endsWith: value.trim().slice(-1) || "empty",
+    jsonCandidates: candidates.length
+  };
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate) as { suggestedActions?: unknown };
+      foundObject = true;
+      const rawActions = Array.isArray(parsed.suggestedActions) ? parsed.suggestedActions : [];
+      latestShape = {
+        topLevelKeys: Object.keys(parsed),
+        rawActionCount: rawActions.length,
+        firstActionFields: rawActions[0] && typeof rawActions[0] === "object" ? Object.keys(rawActions[0] as Record<string, unknown>) : []
+      };
+      if (validActions(parsed.suggestedActions)) return { actions: parsed.suggestedActions, reason: "", shape: latestShape };
+    } catch {
+      // Try the next possible JSON block.
+    }
   }
+
+  return {
+    actions: null,
+    reason: foundObject ? "The JSON object did not contain complete workflow actions" : "The response did not contain a JSON object",
+    shape: latestShape
+  };
 }
 
 function validActions(value: unknown): value is SuggestedAgentAction[] {
-  return Array.isArray(value) && value.length >= 1 && value.length <= 5 && value.every((action) => {
+  return Array.isArray(value) && value.length >= 2 && value.length <= 4 && value.every((action) => {
     if (!action || typeof action !== "object") return false;
     const item = action as Record<string, unknown>;
-    return ["key", "label", "description", "starterQuestion", "workflowInstructions", "completionCriteria"].every((field) => typeof item[field] === "string" && item[field]) && Array.isArray(item.requiredInformation) && Array.isArray(item.safetyConstraints);
-  });
+    return ["key", "label", "description", "starterQuestion", "workflowInstructions", "completionCriteria"].every((field) => typeof item[field] === "string" && item[field].trim()) && nonEmptyStringArray(item.requiredInformation) && nonEmptyStringArray(item.safetyConstraints);
+  }) && new Set(value.map((action) => action.key.trim().toLowerCase())).size === value.length && new Set(value.map((action) => action.label.trim().toLowerCase())).size === value.length;
 }
 
 function actionsMatchDefinition(actions: SuggestedAgentAction[], definition: AgentDefinition) {
   const definitionTerms = terms(`${definition.role} ${definition.mission} ${definition.scope.join(" ")}`);
-  const genericLabels = new Set(["check focus", "review progress", "get started", "plan next step"]);
-  if (actions.length < 2 || actions.some((action) => genericLabels.has(action.label.toLowerCase()))) return false;
-  return actions.every((action) => {
-    const actionTerms = terms(`${action.label} ${action.description} ${action.starterQuestion} ${action.requiredInformation.join(" ")}`);
-    return [...actionTerms].some((term) => definitionTerms.has(term));
+  const genericLabels = new Set(["check focus", "review progress", "get started", "plan next step", "create action plan", "create brief"]);
+  if (!validActions(actions) || actions.some((action) => genericLabels.has(action.label.toLowerCase()))) return false;
+
+  const actionTerms = actions.map((action) => terms(`${action.label} ${action.description} ${action.starterQuestion} ${action.workflowInstructions} ${action.requiredInformation.join(" ")} ${action.completionCriteria}`));
+  const minimumMatches = definitionTerms.size >= 5 ? 2 : 1;
+  return actionTerms.every((termsForAction, index) => {
+    const alignedTerms = [...termsForAction].filter((term) => definitionTerms.has(term));
+    if (alignedTerms.length < minimumMatches) return false;
+    return actionTerms.every((otherTerms, otherIndex) => index === otherIndex || jaccardSimilarity(termsForAction, otherTerms) < 0.8);
   });
+}
+
+function nonEmptyStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === "string" && item.trim());
+}
+
+function jaccardSimilarity(left: Set<string>, right: Set<string>) {
+  const union = new Set([...left, ...right]);
+  if (!union.size) return 1;
+  const intersection = [...left].filter((term) => right.has(term));
+  return intersection.length / union.size;
 }
 
 function terms(value: string) {

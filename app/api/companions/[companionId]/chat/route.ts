@@ -10,6 +10,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { selectPortraitState } from "@/lib/companion/portrait-state";
 import { retrieveRelevantAgentMemories } from "@/lib/companion/agent-memory";
 import { extractStructuredResult } from "@/lib/companion/structured-output";
+import { queueCompanionArchive } from "@/lib/companion/archive";
 
 const schema = z.object({ message: z.string().min(1).max(1200) });
 
@@ -106,6 +107,7 @@ export async function POST(request: Request, context: { params: Promise<{ compan
         }
       });
     });
+    await queueCompanionArchive(companionId, completion ? "workflow_completed" : memoryCandidates.length ? "memory_updated" : "conversation_updated");
 
     return NextResponse.json({
       response,

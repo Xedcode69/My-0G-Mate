@@ -2,6 +2,7 @@ import { z } from "zod";
 import { jsonError, parseJson, walletFromRequest } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
+import { queueCompanionArchive } from "@/lib/companion/archive";
 
 const schema = z.object({
   chatId: z.string().cuid(),
@@ -38,6 +39,7 @@ export async function POST(request: Request, context: { params: Promise<{ compan
         tags: ["feedback", feedbackLabel]
       }
     });
+    await queueCompanionArchive(companionId, "agent_feedback");
 
     return Response.json({ feedback: memory });
   } catch (error) {

@@ -6,6 +6,7 @@ import { jsonError, parseJson, walletFromRequest } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 import { defaultAgentTemplate } from "@/lib/companion/agent-templates";
 import { workflowDefinitionsForAgent } from "@/lib/companion/agent-templates";
+import { queueCompanionArchive } from "@/lib/companion/archive";
 
 const agentProfileSchema = z.object({
   role: z.string().trim().min(2).max(80),
@@ -140,6 +141,7 @@ export async function POST(request: Request) {
         include: { personality: true, agentProfile: true, memories: true, chatLogs: true }
       });
     });
+    await queueCompanionArchive(companion.id, "companion_created");
 
     return NextResponse.json({ companion }, { status: 201 });
   } catch (error) {

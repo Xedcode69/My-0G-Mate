@@ -257,6 +257,7 @@ model ChatLog {
   companionId       String    @map("companion_id")
   userMessage       String    @map("user_message")
   companionResponse String    @map("companion_response")
+  structuredOutput  Json?     @map("structured_output")
   createdAt         DateTime  @default(now()) @map("created_at")
   companion         Companion @relation(fields: [companionId], references: [id], onDelete: Cascade)
 

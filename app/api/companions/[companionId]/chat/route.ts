@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { selectPortraitState } from "@/lib/companion/portrait-state";
 import { retrieveRelevantAgentMemories } from "@/lib/companion/agent-memory";
+import { extractStructuredResult } from "@/lib/companion/structured-output";
 
 const schema = z.object({ message: z.string().min(1).max(1200) });
 
@@ -45,12 +46,14 @@ export async function POST(request: Request, context: { params: Promise<{ compan
     const activeWorkflow = companion.agentActionRuns[0];
     const generatedResponse = await generateCompanionReply([
       { role: "system", content: buildSystemPrompt(companion, relevantAgentMemories) },
+      { role: "system", content: "Use normal conversational prose by default. When the user asks for a concrete deliverable (such as recommendations, a plan, a checklist, a comparison, or a research summary), or when an active workflow is genuinely complete, append a machine-readable result after your natural response in exactly this format: [[STRUCTURED_RESULT:{\"type\":\"recommendations|plan|research|checklist|summary\",\"title\":\"...\",\"summary\":\"...\",\"items\":[{\"title\":\"...\",\"subtitle\":\"...\",\"description\":\"...\",\"tags\":[\"...\"]}],\"followUps\":[\"...\"]}]]. Keep it valid JSON, concise, and do not add this marker for ordinary conversation." },
       ...(activeWorkflow ? [{ role: "system" as const, content: `Active workflow: ${activeWorkflow.action.label}. ${activeWorkflow.action.workflowInstructions} Required information still to clarify: ${activeWorkflow.action.requiredInformation.join(", ")}. Completion criteria: ${activeWorkflow.action.completionCriteria}. Safety constraints: ${activeWorkflow.action.safetyConstraints.join("; ")}. Continue this workflow naturally. Only when the completion criteria are genuinely met, append [[WORKFLOW_COMPLETE: concise outcome and next step]] at the end of your response.` }] : []),
       ...history,
       { role: "user", content: body.message }
     ]);
-    const completion = activeWorkflow ? extractWorkflowCompletion(generatedResponse) : null;
-    const response = completion?.response ?? generatedResponse;
+    const structured = extractStructuredResult(generatedResponse);
+    const completion = activeWorkflow ? extractWorkflowCompletion(structured.response) : null;
+    const response = completion?.response ?? structured.response;
 
     const memoryCandidates = extractMemoryCandidates(body.message);
     const relationship = nextRelationshipScores(companion, memoryCandidates.length ? 3 : 2);
@@ -59,7 +62,7 @@ export async function POST(request: Request, context: { params: Promise<{ compan
       : adaptPersonality({ humorScore: 50, supportivenessScore: 50, curiosityScore: 50, emotionalScore: 50, conciseScore: 50 }, body.message);
 
     const updated = await prisma.$transaction(async (tx) => {
-      await tx.chatLog.create({ data: { companionId, userMessage: body.message, companionResponse: response } });
+      await tx.chatLog.create({ data: { companionId, userMessage: body.message, companionResponse: response, structuredOutput: structured.structuredOutput } });
       if (relevantAgentMemories.length > 0) {
         await tx.agentMemory.updateMany({
           where: { id: { in: relevantAgentMemories.map((memory) => memory.id) } },

@@ -7,6 +7,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { companionArchetypes, moodLabels, relationshipLabels } from "@/lib/companion/archetypes";
 import { defaultAgentTemplate } from "@/lib/companion/agent-templates";
 import { portraitDirections, selectPortraitState, type PortraitActivityState, type PortraitVisualState } from "@/lib/companion/portrait-state";
+import type { StructuredResult } from "@/lib/companion/structured-output";
 import { cn } from "@/lib/ui";
 
 type CompanionType = "ROBOT" | "PET" | "ANIME_GIRL" | "SPIRIT" | "CUSTOM";
@@ -33,7 +34,7 @@ type Companion = {
   attachmentScore: number;
   evolutionStage: number;
   memories: { id: string; memoryType: string; content: string; importance: number }[];
-  chatLogs: { id: string; userMessage: string; companionResponse: string; createdAt: string }[];
+  chatLogs: { id: string; userMessage: string; companionResponse: string; structuredOutput?: StructuredResult | null; createdAt: string }[];
 };
 
 export function CompanionDashboard() {
@@ -459,6 +460,7 @@ export function CompanionDashboard() {
                     )}
                   </div>
                 </div>
+                {chat.structuredOutput && <StructuredResultCard result={chat.structuredOutput} onFollowUp={(followUp) => setMessage(followUp)} />}
               </div>
             ))}
           </div>
@@ -550,6 +552,27 @@ function MessageAvatar({ label, image, kind }: { label: string; image?: string |
     <div className={cn("mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full border-2 border-white text-xs font-semibold text-white shadow-sm", kind === "user" ? "bg-ember" : "bg-mint")} aria-label={`${label} avatar`} title={label}>
       {kind === "user" ? label.slice(0, 1).toUpperCase() : <Bot className="h-4 w-4" />}
     </div>
+  );
+}
+
+function StructuredResultCard({ result, onFollowUp }: { result: StructuredResult; onFollowUp: (followUp: string) => void }) {
+  return (
+    <section className="ml-10 max-w-[78%] rounded-xl border border-black/10 bg-white p-3 shadow-sm">
+      <div className="text-xs font-semibold uppercase tracking-wide text-black/45">{result.type}</div>
+      <h4 className="mt-1 font-semibold">{result.title}</h4>
+      {result.summary && <p className="mt-1 text-sm text-black/60">{result.summary}</p>}
+      <div className="mt-3 space-y-2">
+        {result.items.map((item, index) => (
+          <div key={`${item.title}-${index}`} className="rounded-lg bg-paper p-2.5">
+            <div className="font-medium">{item.title}</div>
+            {item.subtitle && <div className="mt-0.5 text-xs text-black/50">{item.subtitle}</div>}
+            {item.description && <div className="mt-1 text-sm text-black/65">{item.description}</div>}
+            {item.tags && item.tags.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{item.tags.map((tag) => <span key={tag} className="rounded-full bg-white px-2 py-0.5 text-[11px] text-black/55">{tag}</span>)}</div>}
+          </div>
+        ))}
+      </div>
+      {result.followUps && result.followUps.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{result.followUps.map((followUp) => <button key={followUp} onClick={() => onFollowUp(followUp)} className="rounded-full border border-black/10 bg-white px-2.5 py-1 text-xs font-medium hover:bg-paper">{followUp}</button>)}</div>}
+    </section>
   );
 }
 

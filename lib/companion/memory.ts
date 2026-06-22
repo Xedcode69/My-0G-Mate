@@ -1,4 +1,4 @@
-import type { Companion, Memory, PersonalityProfile } from "@prisma/client";
+import type { AgentActionDefinition, AgentActionRun, AgentGoal, AgentMemory, AgentProfile, AgentProject, ChatLog, Companion, Memory, PersonalityProfile, User } from "@prisma/client";
 
 export type MemoryCandidate = {
   type: string;
@@ -94,5 +94,47 @@ export function buildMemorySnapshot(
       .sort((a, b) => b.importance - a.importance)
       .slice(0, 25)
       .map((memory) => `${memory.memoryType}: ${memory.content}`)
+  };
+}
+
+type AgentArchiveSource = Companion & {
+  user: Pick<User, "walletAddress">;
+  personality: PersonalityProfile | null;
+  memories: Memory[];
+  agentProfile: AgentProfile | null;
+  agentMemories: AgentMemory[];
+  agentProjects: AgentProject[];
+  agentGoals: AgentGoal[];
+  agentActions: AgentActionDefinition[];
+  agentActionRuns: (AgentActionRun & { action: AgentActionDefinition })[];
+  chatLogs: ChatLog[];
+};
+
+export function buildAgentArchive(companion: AgentArchiveSource, snapshotVersion: number) {
+  return {
+    format: "mymate-agent-archive",
+    formatVersion: 1,
+    snapshotVersion,
+    archivedAt: new Date().toISOString(),
+    companion: {
+      id: companion.id,
+      name: companion.name,
+      type: companion.type,
+      customTypeName: companion.customTypeName,
+      mood: companion.mood,
+      relationshipLevel: companion.relationshipLevel,
+      trustScore: companion.trustScore,
+      attachmentScore: companion.attachmentScore,
+      evolutionStage: companion.evolutionStage
+    },
+    agentProfile: companion.agentProfile,
+    personalityProfile: companion.personality,
+    memories: companion.memories.filter((memory) => memory.importance >= 6),
+    agentMemories: companion.agentMemories,
+    projects: companion.agentProjects,
+    goals: companion.agentGoals,
+    actionDefinitions: companion.agentActions,
+    actionRuns: companion.agentActionRuns,
+    recentConversations: companion.chatLogs.slice(0, 100)
   };
 }

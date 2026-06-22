@@ -6,6 +6,7 @@ import { buildSystemPrompt } from "@/lib/companion/prompts";
 import { jsonError, parseJson, walletFromRequest } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
+import { queueCompanionArchive } from "@/lib/companion/archive";
 
 const schema = z.object({ actionId: z.string().cuid() });
 
@@ -62,6 +63,7 @@ export async function POST(request: Request, context: { params: Promise<{ compan
       });
       return { run, companion: updatedCompanion };
     });
+    await queueCompanionArchive(companionId, "workflow_started");
 
     return NextResponse.json({ ...updated, response });
   } catch (error) {

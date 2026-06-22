@@ -51,6 +51,13 @@ enum AgentActionRunStatus {
   CANCELLED
 }
 
+enum ArchiveJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETE
+  FAILED
+}
+
 model User {
   id            String      @id @default(cuid())
   walletAddress String      @unique @map("wallet_address")
@@ -93,9 +100,27 @@ model Companion {
   activityLogs      ActivityLog[]
   chatLogs          ChatLog[]
   memorySnapshots   MemorySnapshot[]
+  archiveJobs       CompanionArchiveJob[]
 
   @@index([userId])
   @@map("companions")
+}
+
+model CompanionArchiveJob {
+  id          String           @id @default(cuid())
+  companionId String           @map("companion_id")
+  reason      String
+  status      ArchiveJobStatus @default(PENDING)
+  attempts    Int              @default(0)
+  rootHash    String?          @map("root_hash")
+  lastError   String?          @map("last_error")
+  requestedAt DateTime         @default(now()) @map("requested_at")
+  processedAt DateTime?        @map("processed_at")
+  companion   Companion        @relation(fields: [companionId], references: [id], onDelete: Cascade)
+
+  @@index([status, requestedAt])
+  @@index([companionId, status])
+  @@map("companion_archive_jobs")
 }
 
 model AgentActionDefinition {
@@ -270,6 +295,8 @@ model MemorySnapshot {
   companionId     String    @map("companion_id")
   rootHash        String    @map("root_hash")
   snapshotVersion Int       @map("snapshot_version")
+  chainTransactionHash String? @map("chain_transaction_hash")
+  anchoredAt      DateTime? @map("anchored_at")
   createdAt       DateTime  @default(now()) @map("created_at")
   companion       Companion @relation(fields: [companionId], references: [id], onDelete: Cascade)
 

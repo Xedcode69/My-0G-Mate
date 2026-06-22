@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Archive, Bot, Brain, CircleUserRound, Heart, ImageUp, Loader2, MessageCircle, MessageSquarePlus, Pencil, Plus, Save, Sparkles, ThumbsDown, ThumbsUp, X } from "lucide-react";
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { companionArchetypes, moodLabels, relationshipLabels } from "@/lib/companion/archetypes";
 import { defaultAgentTemplate } from "@/lib/companion/agent-templates";
 import { portraitDirections, selectPortraitState, type PortraitActivityState, type PortraitVisualState } from "@/lib/companion/portrait-state";
 import type { StructuredResult } from "@/lib/companion/structured-output";
+import { companionRegistryConfig, registerCompanionOnchain, updateCompanionArchiveOnchain } from "@/lib/blockchain/companion-registry";
 import { cn } from "@/lib/ui";
 
 type CompanionType = "ROBOT" | "PET" | "ANIME_GIRL" | "SPIRIT" | "CUSTOM";
@@ -15,9 +16,12 @@ type CompanionMood = "HAPPY" | "NEUTRAL" | "LONELY" | "EXCITED";
 type AgentGoal = { id: string; title: string; status: "ACTIVE" | "PAUSED" | "COMPLETE"; priority: number; progress: number; nextStep?: string | null };
 type AgentInsights = { role: string; mission: string; capabilities: string[]; learned: { id: string; category: string; content: string; importance: number }[]; feedback: { helpful: number; unhelpful: number; corrected: number } };
 type WorkflowAction = { id: string; label: string; description: string; starterQuestion: string };
+type ChainStatus = { registryConfigured: boolean; registryStatus: "READY" | "NOT_DEPLOYED" | "UNREACHABLE" | "NOT_CONFIGURED"; storageConfigured: boolean; archiveWorkerConfigured: boolean };
+type ArchiveStatus = { snapshot?: { rootHash: string; snapshotVersion: number; anchoredAt?: string | null } | null; latestJob?: { status: string } | null };
 
 type Companion = {
   id: string;
+  blockchainId?: string | null;
   name: string;
   type: CompanionType;
   avatarKey: string;
@@ -39,6 +43,7 @@ type Companion = {
 
 export function CompanionDashboard() {
   const { logout, user } = usePrivy();
+  const { wallets } = useWallets();
   const router = useRouter();
   const [companions, setCompanions] = useState<Companion[]>([]);
   const [activeId, setActiveId] = useState("");
@@ -59,12 +64,15 @@ export function CompanionDashboard() {
   const [agentInsights, setAgentInsights] = useState<AgentInsights | null>(null);
   const [workflowActions, setWorkflowActions] = useState<WorkflowAction[]>([]);
   const [workflowBusy, setWorkflowBusy] = useState(false);
+  const [chainStatus, setChainStatus] = useState<ChainStatus | null>(null);
+  const [archiveStatus, setArchiveStatus] = useState<ArchiveStatus | null>(null);
   const wallet = user?.wallet?.address?.toLowerCase() ?? "";
 
   const active = companions.find((companion) => companion.id === activeId) ?? companions[0];
   const archetype = active ? companionArchetypes[active.type] : companionArchetypes.ROBOT;
   const activeTypeLabel = active?.customTypeName || archetype.label;
   const agentActionLabel = active?.agentProfile?.role || defaultAgentTemplate.label;
+  const browserRegistryConfig = companionRegistryConfig();
   const messages = useMemo(() => [...(active?.chatLogs ?? [])].reverse(), [active?.chatLogs]);
   const latestChat = active?.chatLogs?.[0];
   const recentTopic = conversationTopic(latestChat?.userMessage);
@@ -81,12 +89,25 @@ export function CompanionDashboard() {
       void loadAgentGoals(active.id);
       void loadAgentInsights(active.id);
       void loadWorkflowActions(active.id);
+      void loadArchiveStatus(active.id);
     } else {
       setAgentGoals([]);
       setAgentInsights(null);
       setWorkflowActions([]);
+      setArchiveStatus(null);
     }
   }, [active?.id, wallet]);
+
+  useEffect(() => {
+    void loadChainStatus();
+  }, []);
+
+  useEffect(() => {
+    const registrationNotice = window.sessionStorage.getItem("mymate:onchain-registration-notice");
+    if (!registrationNotice) return;
+    window.sessionStorage.removeItem("mymate:onchain-registration-notice");
+    setStatus(registrationNotice);
+  }, []);
 
   useEffect(() => {
     if (wallet) {
@@ -155,6 +176,24 @@ export function CompanionDashboard() {
     }
   }
 
+  async function loadArchiveStatus(companionId: string) {
+    try {
+      const data = await fetch(`/api/companions/${companionId}/archive`, { headers: { "x-wallet-address": wallet } }).then((response) => response.json());
+      setArchiveStatus(data);
+    } catch {
+      setArchiveStatus(null);
+    }
+  }
+
+  async function loadChainStatus() {
+    try {
+      const data = await fetch("/api/chain-status").then((response) => response.json());
+      setChainStatus(data);
+    } catch {
+      setChainStatus(null);
+    }
+  }
+
   async function startWorkflow(action: WorkflowAction) {
     if (!active) return;
     setWorkflowBusy(true);
@@ -188,6 +227,59 @@ export function CompanionDashboard() {
       setStatus(error instanceof Error ? error.message : "Unable to regenerate workflows");
     } finally {
       setWorkflowBusy(false);
+    }
+  }
+
+  async function registerActiveCompanionOnchain() {
+    if (!active || !companionRegistryConfig()) return;
+    const signingWallet = wallets.find((candidate) => candidate.address.toLowerCase() === wallet);
+    if (!signingWallet) {
+      setStatus("Your connected wallet is unavailable for 0G registration");
+      return;
+    }
+    setBusy(true);
+    try {
+      const provider = await signingWallet.getEthereumProvider();
+      const registration = await registerCompanionOnchain(provider, active.customTypeName || activeTypeLabel);
+      const data = await request<{ companion: { blockchainId: string } }>(`/api/companions/${active.id}/chain`, { method: "PATCH", body: JSON.stringify({ blockchainId: registration.companionId }) });
+      setCompanions((current) => current.map((companion) => companion.id === active.id ? { ...companion, blockchainId: data.companion.blockchainId } : companion));
+      setStatus("Companion ownership registered on 0G mainnet");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Unable to register companion on 0G mainnet");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function syncLatestArchiveOnchain() {
+    if (!active?.blockchainId || !companionRegistryConfig()) return;
+    const signingWallet = wallets.find((candidate) => candidate.address.toLowerCase() === wallet);
+    if (!signingWallet) {
+      setStatus("Your connected wallet is unavailable for archive sync");
+      return;
+    }
+    setBusy(true);
+    try {
+      const archiveResponse = await fetch(`/api/companions/${active.id}/archive`, { headers: { "x-wallet-address": wallet } });
+      const archiveData = await archiveResponse.json();
+      if (!archiveResponse.ok) throw new Error(archiveData.error ?? "Unable to load latest archive");
+      if (!archiveData.snapshot) throw new Error("No encrypted archive exists yet. Create or wait for an archive first.");
+      if (archiveData.snapshot.anchoredAt) {
+        setStatus("The latest encrypted archive is already anchored on 0G mainnet");
+        return;
+      }
+      const provider = await signingWallet.getEthereumProvider();
+      const transaction = await updateCompanionArchiveOnchain(provider, active.blockchainId, archiveData.snapshot.rootHash, archiveData.snapshot.snapshotVersion);
+      await request(`/api/companions/${active.id}/archive`, {
+        method: "PATCH",
+        body: JSON.stringify({ snapshotVersion: archiveData.snapshot.snapshotVersion, transactionHash: transaction.transactionHash })
+      });
+      await loadArchiveStatus(active.id);
+      setStatus("Latest encrypted archive anchored on 0G mainnet");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Unable to sync archive to 0G mainnet");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -272,6 +364,7 @@ export function CompanionDashboard() {
     setBusy(true);
     try {
       const data = await request<{ upload: { rootHash: string; provider: string } }>(`/api/companions/${active.id}/snapshots`, { method: "POST" });
+      await loadArchiveStatus(active.id);
       setStatus(`Memory snapshot archived: ${data.upload.rootHash.slice(0, 18)}...`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Snapshot failed");
@@ -342,8 +435,19 @@ export function CompanionDashboard() {
                   <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-black/45">Wallet</div>
                   <div className="truncate rounded-lg border border-black/10 bg-white px-3 py-2 font-mono text-xs text-black/60">{wallet}</div>
                 </div>
+                <div className="rounded-lg bg-paper p-3 text-xs">
+                  <div className="flex items-center justify-between"><span className="font-semibold text-black/65">0G status</span><span className={cn("rounded-full px-2 py-0.5", chainStatus?.registryStatus === "READY" ? "bg-mint/15 text-mint" : "bg-white text-black/50")}>{chainStatus?.registryStatus === "READY" ? "Ready" : "Setup needed"}</span></div>
+                  <div className="mt-2 space-y-1 text-black/55">
+                    <div>Registry: {active?.blockchainId ? `Companion #${active.blockchainId}` : "Not registered"}</div>
+                    {!active?.blockchainId && <div>Browser registration: {browserRegistryConfig ? "Available" : "Restart needed after public 0G configuration"}</div>}
+                    <div>Archive: {archiveStatus?.snapshot ? `v${archiveStatus.snapshot.snapshotVersion}${archiveStatus.snapshot.anchoredAt ? " · anchored" : " · not anchored"}` : archiveStatus?.latestJob ? `Queued (${archiveStatus.latestJob.status.toLowerCase()})` : "None yet"}</div>
+                    <div>Storage: {chainStatus?.storageConfigured ? "0G configured" : "Local fallback"}</div>
+                  </div>
+                </div>
                 {profileEditing && <button onClick={saveProfile} disabled={profileBusy} className="flex w-full items-center justify-center gap-2 rounded-lg bg-ink px-3 py-2.5 text-sm font-medium text-white disabled:opacity-50"><Save className="h-4 w-4" /> Save changes</button>}
                 <button onClick={() => { setProfileOpen(false); router.push("/onboarding"); }} className="flex w-full items-center justify-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2.5 text-sm font-medium hover:bg-paper"><Plus className="h-4 w-4" /> Add companion</button>
+                {active && !active.blockchainId && <button onClick={() => void registerActiveCompanionOnchain()} disabled={busy || !browserRegistryConfig} title={browserRegistryConfig ? undefined : "Restart the app after setting NEXT_PUBLIC_COMPANION_REGISTRY_ADDRESS and NEXT_PUBLIC_ZERO_G_CHAIN_ID"} className="w-full rounded-lg border border-black/10 bg-white px-3 py-2.5 text-sm font-medium hover:bg-paper disabled:cursor-not-allowed disabled:opacity-50">{browserRegistryConfig ? `Register ${active.name} on 0G` : "Register on 0G (restart required)"}</button>}
+                {active?.blockchainId && browserRegistryConfig && <button onClick={() => void syncLatestArchiveOnchain()} disabled={busy} className="w-full rounded-lg border border-black/10 bg-white px-3 py-2.5 text-sm font-medium hover:bg-paper disabled:opacity-50">Sync latest archive to 0G</button>}
                 <button onClick={logout} className="w-full rounded-lg px-3 py-2 text-sm text-black/55 hover:bg-paper hover:text-ink">Log out</button>
               </div>
             </div>

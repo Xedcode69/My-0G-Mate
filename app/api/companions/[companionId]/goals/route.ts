@@ -2,6 +2,7 @@ import { AgentGoalStatus } from "@prisma/client";
 import { z } from "zod";
 import { jsonError, parseJson, walletFromRequest } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
+import { queueCompanionArchive } from "@/lib/companion/archive";
 
 const sharedFields = {
   title: z.string().trim().min(2).max(160),
@@ -45,6 +46,7 @@ export async function POST(request: Request, context: { params: Promise<{ compan
       const project = await prisma.agentProject.create({
         data: { companionId, title: body.title, description: body.description, priority: body.priority, progress: body.progress, nextStep: body.nextStep, status: body.status }
       });
+      await queueCompanionArchive(companionId, "project_created");
       return Response.json({ project }, { status: 201 });
     }
 
@@ -55,6 +57,7 @@ export async function POST(request: Request, context: { params: Promise<{ compan
     const goal = await prisma.agentGoal.create({
       data: { companionId, projectId: body.projectId, title: body.title, priority: body.priority, progress: body.progress, nextStep: body.nextStep, status: body.status }
     });
+    await queueCompanionArchive(companionId, "goal_created");
     return Response.json({ goal }, { status: 201 });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Unable to create agent work item");

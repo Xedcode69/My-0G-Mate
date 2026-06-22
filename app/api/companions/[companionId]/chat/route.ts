@@ -63,7 +63,7 @@ export async function POST(request: Request, context: { params: Promise<{ compan
       : adaptPersonality({ humorScore: 50, supportivenessScore: 50, curiosityScore: 50, emotionalScore: 50, conciseScore: 50 }, body.message);
 
     const updated = await prisma.$transaction(async (tx) => {
-      await tx.chatLog.create({ data: { companionId, userMessage: body.message, companionResponse: response, structuredOutput: structured.structuredOutput } });
+      await tx.chatLog.create({ data: { companionId, userMessage: body.message, companionResponse: response, structuredOutput: structured.structuredOutput ?? undefined } });
       if (relevantAgentMemories.length > 0) {
         await tx.agentMemory.updateMany({
           where: { id: { in: relevantAgentMemories.map((memory) => memory.id) } },

@@ -8,7 +8,7 @@ import { companionArchetypes, moodLabels, relationshipLabels } from "@/lib/compa
 import { defaultAgentTemplate } from "@/lib/companion/agent-templates";
 import { portraitDirections, selectPortraitState, type PortraitActivityState, type PortraitVisualState } from "@/lib/companion/portrait-state";
 import type { StructuredResult } from "@/lib/companion/structured-output";
-import { companionRegistryConfig, registerCompanionOnchain } from "@/lib/blockchain/companion-registry";
+import { companionRegistryConfig, registerCompanionOnchain, updateCompanionArchiveOnchain } from "@/lib/blockchain/companion-registry";
 import { cn } from "@/lib/ui";
 
 type CompanionType = "ROBOT" | "PET" | "ANIME_GIRL" | "SPIRIT" | "CUSTOM";
@@ -215,6 +215,37 @@ export function CompanionDashboard() {
     }
   }
 
+  async function syncLatestArchiveOnchain() {
+    if (!active?.blockchainId || !companionRegistryConfig()) return;
+    const signingWallet = wallets.find((candidate) => candidate.address.toLowerCase() === wallet);
+    if (!signingWallet) {
+      setStatus("Your connected wallet is unavailable for archive sync");
+      return;
+    }
+    setBusy(true);
+    try {
+      const archiveResponse = await fetch(`/api/companions/${active.id}/archive`, { headers: { "x-wallet-address": wallet } });
+      const archiveData = await archiveResponse.json();
+      if (!archiveResponse.ok) throw new Error(archiveData.error ?? "Unable to load latest archive");
+      if (!archiveData.snapshot) throw new Error("No encrypted archive exists yet. Create or wait for an archive first.");
+      if (archiveData.snapshot.anchoredAt) {
+        setStatus("The latest encrypted archive is already anchored on 0G mainnet");
+        return;
+      }
+      const provider = await signingWallet.getEthereumProvider();
+      const transaction = await updateCompanionArchiveOnchain(provider, active.blockchainId, archiveData.snapshot.rootHash, archiveData.snapshot.snapshotVersion);
+      await request(`/api/companions/${active.id}/archive`, {
+        method: "PATCH",
+        body: JSON.stringify({ snapshotVersion: archiveData.snapshot.snapshotVersion, transactionHash: transaction.transactionHash })
+      });
+      setStatus("Latest encrypted archive anchored on 0G mainnet");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Unable to sync archive to 0G mainnet");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function saveProfile() {
     if (profileName.trim().length < 2) {
       setStatus("Profile name must be at least 2 characters");
@@ -369,6 +400,7 @@ export function CompanionDashboard() {
                 {profileEditing && <button onClick={saveProfile} disabled={profileBusy} className="flex w-full items-center justify-center gap-2 rounded-lg bg-ink px-3 py-2.5 text-sm font-medium text-white disabled:opacity-50"><Save className="h-4 w-4" /> Save changes</button>}
                 <button onClick={() => { setProfileOpen(false); router.push("/onboarding"); }} className="flex w-full items-center justify-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2.5 text-sm font-medium hover:bg-paper"><Plus className="h-4 w-4" /> Add companion</button>
                 {active && !active.blockchainId && companionRegistryConfig() && <button onClick={() => void registerActiveCompanionOnchain()} disabled={busy} className="w-full rounded-lg border border-black/10 bg-white px-3 py-2.5 text-sm font-medium hover:bg-paper disabled:opacity-50">Register {active.name} on 0G</button>}
+                {active?.blockchainId && companionRegistryConfig() && <button onClick={() => void syncLatestArchiveOnchain()} disabled={busy} className="w-full rounded-lg border border-black/10 bg-white px-3 py-2.5 text-sm font-medium hover:bg-paper disabled:opacity-50">Sync latest archive to 0G</button>}
                 <button onClick={logout} className="w-full rounded-lg px-3 py-2 text-sm text-black/55 hover:bg-paper hover:text-ink">Log out</button>
               </div>
             </div>

@@ -295,6 +295,8 @@ model MemorySnapshot {
   companionId     String    @map("companion_id")
   rootHash        String    @map("root_hash")
   snapshotVersion Int       @map("snapshot_version")
+  chainTransactionHash String? @map("chain_transaction_hash")
+  anchoredAt      DateTime? @map("anchored_at")
   createdAt       DateTime  @default(now()) @map("created_at")
   companion       Companion @relation(fields: [companionId], references: [id], onDelete: Cascade)
 

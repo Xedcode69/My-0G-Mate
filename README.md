@@ -55,3 +55,18 @@ ZERO_G_STORAGE_ENCRYPTION_KEY="base64-encoded-32-byte-key"
 ```
 
 If those are missing, the API returns a deterministic `local-*` root hash so development can continue without uploading private memory data.
+
+## Automated archives and 0G Chain ownership
+
+Companion changes queue encrypted archive jobs. A scheduler should call `POST /api/cron/archives` with `Authorization: Bearer <CRON_SECRET>` every few minutes. `ARCHIVE_DEBOUNCE_SECONDS` controls how long the worker waits to batch recent changes.
+
+For user-signed 0G Chain ownership, deploy `contracts/CompanionRegistry.sol` to 0G mainnet, then configure:
+
+```bash
+NEXT_PUBLIC_COMPANION_REGISTRY_ADDRESS="0x..."
+NEXT_PUBLIC_ZERO_G_CHAIN_ID="..."
+CRON_SECRET="long-random-secret"
+ARCHIVE_DEBOUNCE_SECONDS="300"
+```
+
+Users register companions and explicitly anchor the latest encrypted archive root hash from the profile menu. The chain stores ownership and encrypted archive references only; it never stores plaintext memory or encryption keys.

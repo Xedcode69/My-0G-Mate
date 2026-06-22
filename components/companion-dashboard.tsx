@@ -16,6 +16,8 @@ type CompanionMood = "HAPPY" | "NEUTRAL" | "LONELY" | "EXCITED";
 type AgentGoal = { id: string; title: string; status: "ACTIVE" | "PAUSED" | "COMPLETE"; priority: number; progress: number; nextStep?: string | null };
 type AgentInsights = { role: string; mission: string; capabilities: string[]; learned: { id: string; category: string; content: string; importance: number }[]; feedback: { helpful: number; unhelpful: number; corrected: number } };
 type WorkflowAction = { id: string; label: string; description: string; starterQuestion: string };
+type ChainStatus = { registryConfigured: boolean; registryStatus: "READY" | "NOT_DEPLOYED" | "UNREACHABLE" | "NOT_CONFIGURED"; storageConfigured: boolean; archiveWorkerConfigured: boolean };
+type ArchiveStatus = { snapshot?: { rootHash: string; snapshotVersion: number; anchoredAt?: string | null } | null; latestJob?: { status: string } | null };
 
 type Companion = {
   id: string;
@@ -62,6 +64,8 @@ export function CompanionDashboard() {
   const [agentInsights, setAgentInsights] = useState<AgentInsights | null>(null);
   const [workflowActions, setWorkflowActions] = useState<WorkflowAction[]>([]);
   const [workflowBusy, setWorkflowBusy] = useState(false);
+  const [chainStatus, setChainStatus] = useState<ChainStatus | null>(null);
+  const [archiveStatus, setArchiveStatus] = useState<ArchiveStatus | null>(null);
   const wallet = user?.wallet?.address?.toLowerCase() ?? "";
 
   const active = companions.find((companion) => companion.id === activeId) ?? companions[0];
@@ -84,12 +88,18 @@ export function CompanionDashboard() {
       void loadAgentGoals(active.id);
       void loadAgentInsights(active.id);
       void loadWorkflowActions(active.id);
+      void loadArchiveStatus(active.id);
     } else {
       setAgentGoals([]);
       setAgentInsights(null);
       setWorkflowActions([]);
+      setArchiveStatus(null);
     }
   }, [active?.id, wallet]);
+
+  useEffect(() => {
+    void loadChainStatus();
+  }, []);
 
   useEffect(() => {
     if (wallet) {
@@ -155,6 +165,24 @@ export function CompanionDashboard() {
       setWorkflowActions(data.actions ?? []);
     } catch {
       setWorkflowActions([]);
+    }
+  }
+
+  async function loadArchiveStatus(companionId: string) {
+    try {
+      const data = await fetch(`/api/companions/${companionId}/archive`, { headers: { "x-wallet-address": wallet } }).then((response) => response.json());
+      setArchiveStatus(data);
+    } catch {
+      setArchiveStatus(null);
+    }
+  }
+
+  async function loadChainStatus() {
+    try {
+      const data = await fetch("/api/chain-status").then((response) => response.json());
+      setChainStatus(data);
+    } catch {
+      setChainStatus(null);
     }
   }
 
@@ -238,6 +266,7 @@ export function CompanionDashboard() {
         method: "PATCH",
         body: JSON.stringify({ snapshotVersion: archiveData.snapshot.snapshotVersion, transactionHash: transaction.transactionHash })
       });
+      await loadArchiveStatus(active.id);
       setStatus("Latest encrypted archive anchored on 0G mainnet");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Unable to sync archive to 0G mainnet");
@@ -327,6 +356,7 @@ export function CompanionDashboard() {
     setBusy(true);
     try {
       const data = await request<{ upload: { rootHash: string; provider: string } }>(`/api/companions/${active.id}/snapshots`, { method: "POST" });
+      await loadArchiveStatus(active.id);
       setStatus(`Memory snapshot archived: ${data.upload.rootHash.slice(0, 18)}...`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Snapshot failed");
@@ -396,6 +426,14 @@ export function CompanionDashboard() {
                 <div>
                   <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-black/45">Wallet</div>
                   <div className="truncate rounded-lg border border-black/10 bg-white px-3 py-2 font-mono text-xs text-black/60">{wallet}</div>
+                </div>
+                <div className="rounded-lg bg-paper p-3 text-xs">
+                  <div className="flex items-center justify-between"><span className="font-semibold text-black/65">0G status</span><span className={cn("rounded-full px-2 py-0.5", chainStatus?.registryStatus === "READY" ? "bg-mint/15 text-mint" : "bg-white text-black/50")}>{chainStatus?.registryStatus === "READY" ? "Ready" : "Setup needed"}</span></div>
+                  <div className="mt-2 space-y-1 text-black/55">
+                    <div>Registry: {active?.blockchainId ? `Companion #${active.blockchainId}` : "Not registered"}</div>
+                    <div>Archive: {archiveStatus?.snapshot ? `v${archiveStatus.snapshot.snapshotVersion}${archiveStatus.snapshot.anchoredAt ? " · anchored" : " · not anchored"}` : archiveStatus?.latestJob ? `Queued (${archiveStatus.latestJob.status.toLowerCase()})` : "None yet"}</div>
+                    <div>Storage: {chainStatus?.storageConfigured ? "0G configured" : "Local fallback"}</div>
+                  </div>
                 </div>
                 {profileEditing && <button onClick={saveProfile} disabled={profileBusy} className="flex w-full items-center justify-center gap-2 rounded-lg bg-ink px-3 py-2.5 text-sm font-medium text-white disabled:opacity-50"><Save className="h-4 w-4" /> Save changes</button>}
                 <button onClick={() => { setProfileOpen(false); router.push("/onboarding"); }} className="flex w-full items-center justify-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2.5 text-sm font-medium hover:bg-paper"><Plus className="h-4 w-4" /> Add companion</button>

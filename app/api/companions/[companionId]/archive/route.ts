@@ -13,8 +13,11 @@ export async function GET(request: Request, context: { params: Promise<{ compani
   const { companionId } = await context.params;
   const companion = await prisma.companion.findFirst({ where: { id: companionId, user: { walletAddress } }, select: { blockchainId: true } });
   if (!companion) return jsonError("Companion not found", 404);
-  const snapshot = await prisma.memorySnapshot.findFirst({ where: { companionId }, orderBy: { snapshotVersion: "desc" } });
-  return Response.json({ companion, snapshot });
+  const [snapshot, latestJob] = await Promise.all([
+    prisma.memorySnapshot.findFirst({ where: { companionId }, orderBy: { snapshotVersion: "desc" } }),
+    prisma.companionArchiveJob.findFirst({ where: { companionId }, orderBy: { requestedAt: "desc" } })
+  ]);
+  return Response.json({ companion, snapshot, latestJob });
 }
 
 export async function PATCH(request: Request, context: { params: Promise<{ companionId: string }> }) {

@@ -1,6 +1,6 @@
 import { ActivityType, CompanionMood } from "@prisma/client";
 import { z } from "zod";
-import { levelFromXp, nextRelationshipScores, xpRewards } from "@/lib/companion/progression";
+import { nextRelationshipScores } from "@/lib/companion/progression";
 import { jsonError, parseJson, walletFromRequest } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
@@ -25,12 +25,10 @@ export async function POST(request: Request, context: { params: Promise<{ compan
     if (await isOnCooldown(companionId, body.activityType)) return jsonError(`${body.activityType} is on cooldown`, 429);
 
     const guessedCorrectly = body.activityType === "PLAY_MINI_GAME" ? body.moodGuess === companion.mood : true;
-    const xpEarned = guessedCorrectly ? xpRewards[body.activityType] : 0;
     const relationship = nextRelationshipScores(companion, body.activityType === "FEED_COMPANION" ? 3 : 2);
-    const xp = companion.xp + xpEarned;
 
     const updated = await prisma.$transaction(async (tx) => {
-      await tx.activityLog.create({ data: { companionId, activityType: body.activityType, xpEarned } });
+      await tx.activityLog.create({ data: { companionId, activityType: body.activityType } });
       if (body.reflection) {
         await tx.memory.create({
           data: { companionId, memoryType: "reflection", content: body.reflection.slice(0, 250), importance: 6 }
@@ -39,20 +37,19 @@ export async function POST(request: Request, context: { params: Promise<{ compan
       return tx.companion.update({
         where: { id: companionId },
         data: {
-          xp,
-          level: levelFromXp(xp),
           mood: body.activityType === "FEED_COMPANION" ? "HAPPY" : companion.mood,
           ...relationship
         },
         include: {
           personality: true,
+          agentProfile: true,
           memories: { orderBy: { importance: "desc" }, take: 12 },
           chatLogs: { orderBy: { createdAt: "desc" }, take: 20 }
         }
       });
     });
 
-    return Response.json({ companion: updated, xpEarned, guessedCorrectly });
+    return Response.json({ companion: updated, guessedCorrectly });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Unable to record activity");
   }

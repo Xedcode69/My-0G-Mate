@@ -75,7 +75,6 @@ model Companion {
   portraitPrompt    String?              @map("portrait_prompt")
   portraitVariants  Json?                @map("portrait_variants")
   level             Int                  @default(1)
-  xp                Int                  @default(0)
   mood              CompanionMood        @default(NEUTRAL)
   relationshipLevel Int                  @default(1) @map("relationship_level")
   trustScore        Int                  @default(5) @map("trust_score")
@@ -246,7 +245,6 @@ model ActivityLog {
   id          String       @id @default(cuid())
   companionId String       @map("companion_id")
   activityType ActivityType @map("activity_type")
-  xpEarned    Int          @map("xp_earned")
   createdAt   DateTime     @default(now()) @map("created_at")
   companion   Companion    @relation(fields: [companionId], references: [id], onDelete: Cascade)
 

@@ -19,7 +19,7 @@ export async function GET(request: Request, context: { params: Promise<{ compani
 
     let actions = await prisma.agentActionDefinition.findMany({ where: { companionId, enabled: true }, orderBy: { sortOrder: "asc" } });
     if (actions.length === 0) {
-      const templates = workflowDefinitionsForAgent(companion.agentProfile);
+      const templates = workflowDefinitionsForAgent(companion.agentProfile ?? undefined);
       await prisma.agentActionDefinition.createMany({ data: templates.map((action) => ({ ...action, companionId, source: "BACKFILL" })) });
       actions = await prisma.agentActionDefinition.findMany({ where: { companionId, enabled: true }, orderBy: { sortOrder: "asc" } });
     }

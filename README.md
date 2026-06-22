@@ -1,6 +1,6 @@
 # MyMate
 
-MyMate is a V1 AI companion platform scaffold focused on persistent memory, relationship growth, mood, XP, companion evolution, and future-ready blockchain and 0G Storage boundaries.
+MyMate is a V1 AI companion platform scaffold focused on persistent memory, relationship growth, mood, companion evolution, guided agent workflows, and future-ready blockchain and 0G Storage boundaries.
 
 ## Quick Start
 
@@ -20,7 +20,7 @@ The app runs at `http://localhost:3000`.
 - Wallet identity passed into companion APIs from the authenticated Privy account.
 - Companion creation with four companion archetypes.
 - Prisma schema for users, companions, memories, profiles, activities, chats, and memory snapshots.
-- AI chat route with in-character system prompt, recent chat context, important memories, XP gain, relationship updates, memory extraction, personality adaptation, and evolution checks.
+- AI chat route with in-character system prompt, recent chat context, important memories, relationship updates, memory extraction, personality adaptation, workflow completion, and evolution checks.
 - Activity route for daily check-in, feeding, reflection prompts, companion questions, and mood guessing.
 - Encrypted memory snapshot service with a 0G Storage adapter boundary.
 - CompanionRegistry Solidity contract for ownership and evolution milestones.

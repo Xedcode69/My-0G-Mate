@@ -27,7 +27,6 @@ type Companion = {
   portraitVariants?: Partial<Record<PortraitVisualState, string>> | null;
   agentProfile?: { templateId?: string | null; role?: string | null; scope?: string[] | null } | null;
   level: number;
-  xp: number;
   mood: CompanionMood;
   relationshipLevel: number;
   trustScore: number;
@@ -243,7 +242,7 @@ export function CompanionDashboard() {
     setPortraitState(selectPortraitState(userMessage));
     try {
       setPortraitActivity("thinking");
-      const data = await request<{ companion: Companion; response: string; memoriesCreated: number; portraitState: PortraitVisualState }>(`/api/companions/${active.id}/chat`, {
+      const data = await request<{ companion: Companion; response: string; memoriesCreated: number; portraitState: PortraitVisualState; workflowCompleted?: boolean; workflowOutcome?: string | null }>(`/api/companions/${active.id}/chat`, {
         method: "POST",
         body: JSON.stringify({ message: userMessage })
       });
@@ -251,7 +250,7 @@ export function CompanionDashboard() {
       setPortraitState(data.portraitState);
       setPortraitActivity("replying");
       window.setTimeout(() => setPortraitActivity("idle"), 1200);
-      setStatus(data.memoriesCreated ? `Saved ${data.memoriesCreated} new memory` : "Conversation saved");
+      setStatus(data.workflowCompleted ? "Workflow completed and outcome saved" : data.memoriesCreated ? `Saved ${data.memoriesCreated} new memory` : "Conversation saved");
     } catch (error) {
       setPortraitActivity("idle");
       setStatus(error instanceof Error ? error.message : "Chat failed");
@@ -394,7 +393,7 @@ export function CompanionDashboard() {
                 <MessageAvatar label={companion.name} image={companion.generatedPortrait || companion.avatarImage} kind="companion" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-semibold">{companion.name}</div>
-                  <div className="truncate text-xs text-black/50">L{companion.level} · {moodLabels[companion.mood]}</div>
+                  <div className="truncate text-xs text-black/50">{relationshipLabels[companion.relationshipLevel]} · {moodLabels[companion.mood]}</div>
                 </div>
                 {active?.id === companion.id && <span className="h-2 w-2 shrink-0 rounded-full bg-mint" aria-label="Active companion" />}
               </button>
@@ -436,9 +435,9 @@ export function CompanionDashboard() {
                   </div>
                 </div>
                 <div className="mt-2 rounded-xl bg-white/80 p-3 shadow-sm">
-                  <div className="flex items-center justify-between text-xs text-black/50"><span>Level {active?.level ?? 1}</span><span>{active?.xp ?? 0} XP</span></div>
-                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-black/[0.08]"><div className="h-full rounded-full bg-ember transition-all" style={{ width: `${Math.min(100, (active?.xp ?? 0) % 100)}%` }} /></div>
-                  <div className="mt-1.5 text-xs text-black/45">{100 - ((active?.xp ?? 0) % 100)} XP to the next level</div>
+                  <div className="flex items-center justify-between text-xs text-black/50"><span>Relationship growth</span><span>{active?.trustScore ?? 0}% trust</span></div>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-black/[0.08]"><div className="h-full rounded-full bg-mint transition-all" style={{ width: `${Math.min(100, active?.trustScore ?? 0)}%` }} /></div>
+                  <div className="mt-1.5 text-xs text-black/45">Grows through useful conversations and completed workflows</div>
                 </div>
                 {workflowActions.length > 0 && <div className="mt-2 flex gap-2">
                   {workflowActions.slice(0, 2).map((action) => <button key={action.id} onClick={() => void startWorkflow(action)} disabled={!active || workflowBusy} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-black/10 bg-white px-2 py-2 text-sm font-medium disabled:opacity-50"><Sparkles className="h-4 w-4" /> {action.label}</button>)}
@@ -507,13 +506,13 @@ export function CompanionDashboard() {
           <div className="rounded-xl bg-white/72 p-4 shadow-[0_8px_28px_rgba(20,21,26,0.05)]">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold">Growth</h3>
-              <span className="rounded-full bg-paper px-2 py-1 text-xs font-medium">Level {active?.level ?? 1}</span>
+              <span className="rounded-full bg-paper px-2 py-1 text-xs font-medium">{relationshipLabels[active?.relationshipLevel ?? 1]}</span>
             </div>
             <div className="mt-4 flex items-end justify-between">
-              <div><div className="text-2xl font-semibold">{active?.xp ?? 0}</div><div className="text-xs text-black/50">Total XP</div></div>
-              <div className="text-right"><div className="text-sm font-semibold">{100 - ((active?.xp ?? 0) % 100)} XP</div><div className="text-xs text-black/50">to next level</div></div>
+              <div><div className="text-2xl font-semibold">{active?.trustScore ?? 0}%</div><div className="text-xs text-black/50">Trust</div></div>
+              <div className="text-right"><div className="text-sm font-semibold">{active?.attachmentScore ?? 0}%</div><div className="text-xs text-black/50">Connection</div></div>
             </div>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-black/[0.08]"><div className="h-full rounded-full bg-ember" style={{ width: `${Math.min(100, (active?.xp ?? 0) % 100)}%` }} /></div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-black/[0.08]"><div className="h-full rounded-full bg-mint" style={{ width: `${Math.min(100, active?.trustScore ?? 0)}%` }} /></div>
             <div className="mt-4 grid grid-cols-2 gap-2 border-t border-black/10 pt-3 text-sm">
               <div><div className="text-xs text-black/45">Trust</div><div className="mt-1 font-semibold">{active?.trustScore ?? 0}</div></div>
               <div><div className="text-xs text-black/45">Evolution</div><div className="mt-1 font-semibold">Stage {active?.evolutionStage ?? 1}</div></div>

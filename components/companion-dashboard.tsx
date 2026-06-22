@@ -367,7 +367,7 @@ export function CompanionDashboard() {
                 <MessageAvatar label={companion.name} image={companion.generatedPortrait || companion.avatarImage} kind="companion" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-semibold">{companion.name}</div>
-                  <div className="truncate text-xs text-black/50">{relationshipLabels[companion.relationshipLevel]} · {moodLabels[companion.mood]}</div>
+                  <div className="truncate text-xs text-black/50">{companion.agentProfile?.role || "Personal AI companion"}</div>
                 </div>
                 {active?.id === companion.id && <span className="h-2 w-2 shrink-0 rounded-full bg-mint" aria-label="Active companion" />}
               </button>

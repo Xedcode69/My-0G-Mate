@@ -71,7 +71,7 @@ async function generateReply(config: ProviderConfig, messages: ChatMessage[], op
     messages,
     temperature: options.temperature ?? 0.8,
     max_tokens: options.maxTokens ?? config.maxTokens,
-    ...(options.jsonObject ? { response_format: { type: "json_object" } } : {}),
+    ...(options.jsonObject ? { response_format: { type: "json_object" as const } } : {}),
     ...(config.verifyTee ? { verify_tee: true } : {})
   };
   const response = await client.chat.completions.create(request);

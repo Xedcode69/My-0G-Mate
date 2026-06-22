@@ -108,8 +108,35 @@ function providerConfig(provider: AiProvider): ProviderConfig {
 
 function teeWasVerified(response: unknown) {
   if (!response || typeof response !== "object") return false;
-  const trace = (response as { trace?: unknown }).trace;
-  return Boolean(trace && typeof trace === "object" && (trace as { tee_verified?: unknown }).tee_verified === true);
+  const record = response as { trace?: unknown; x_0g_trace?: unknown; tee_verified?: unknown; metadata?: unknown };
+  const trace = asRecord(record.trace);
+  const zeroGTrace = asRecord(record.x_0g_trace);
+  const metadata = asRecord(record.metadata);
+  const verified = record.tee_verified === true || trace?.tee_verified === true || zeroGTrace?.tee_verified === true || metadata?.tee_verified === true;
+
+  if (!verified && process.env.NODE_ENV !== "production") {
+    console.warn("0G TEE verification metadata was not found", {
+      responseKeys: Object.keys(record).filter((key) => key !== "choices"),
+      traceType: typeof record.trace,
+      traceKeys: trace ? Object.keys(trace) : [],
+      zeroGTraceType: typeof record.x_0g_trace,
+      zeroGTraceKeys: zeroGTrace ? Object.keys(zeroGTrace) : [],
+      metadataKeys: metadata ? Object.keys(metadata) : []
+    });
+  }
+
+  return verified;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (value && typeof value === "object") return value as Record<string, unknown>;
+  if (typeof value !== "string") return null;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
 }
 
 class TeeVerificationError extends Error {

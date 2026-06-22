@@ -5,6 +5,11 @@ export type ChatMessage = {
   content: string;
 };
 
+export type GenerateReplyOptions = {
+  maxTokens?: number;
+  temperature?: number;
+};
+
 type AiProvider = "openai" | "0g";
 
 type ProviderConfig = {
@@ -23,13 +28,13 @@ export function isLlmConfigured() {
   return Boolean(providerConfig(activeProvider()).apiKey);
 }
 
-export async function generateCompanionReply(messages: ChatMessage[]) {
+export async function generateCompanionReply(messages: ChatMessage[], options: GenerateReplyOptions = {}) {
   const provider = activeProvider();
   const config = providerConfig(provider);
   if (!config.apiKey) return fallbackReply(messages);
 
   try {
-    return await generateReply(config, messages);
+    return await generateReply(config, messages, options);
   } catch (error) {
     if (error instanceof TeeVerificationError) {
       console.error(error.message);
@@ -41,7 +46,7 @@ export async function generateCompanionReply(messages: ChatMessage[]) {
 
     if (fallbackConfig?.apiKey) {
       try {
-        return await generateReply(fallbackConfig, messages);
+        return await generateReply(fallbackConfig, messages, options);
       } catch {
         // Return the local reply below when both configured providers are unavailable.
       }
@@ -52,7 +57,7 @@ export async function generateCompanionReply(messages: ChatMessage[]) {
   }
 }
 
-async function generateReply(config: ProviderConfig, messages: ChatMessage[]) {
+async function generateReply(config: ProviderConfig, messages: ChatMessage[], options: GenerateReplyOptions) {
   const client = new OpenAI({
     apiKey: config.apiKey,
     baseURL: config.baseURL,
@@ -62,8 +67,8 @@ async function generateReply(config: ProviderConfig, messages: ChatMessage[]) {
   const request = {
     model: config.model,
     messages,
-    temperature: 0.8,
-    max_tokens: 260,
+    temperature: options.temperature ?? 0.8,
+    max_tokens: options.maxTokens ?? 260,
     ...(config.verifyTee ? { verify_tee: true } : {})
   };
   const response = await client.chat.completions.create(request);
@@ -147,6 +152,10 @@ class TeeVerificationError extends Error {
 }
 
 function fallbackReply(messages: ChatMessage[]) {
+  const workflowInstruction = messages.find((message) => message.role === "system" && message.content.startsWith("An agent workflow has just started."))?.content;
+  const openingQuestion = workflowInstruction?.match(/Start by asking this opening question, naturally and only once:\s*([\s\S]+)$/)?.[1]?.trim();
+  if (openingQuestion) return openingQuestion;
+
   const userMessage = [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
   if (/learning|build|blockchain|code/i.test(userMessage)) {
     return "I like that direction. Tell me what part you are working on now, and I will keep track of it so we can build on it together.";

@@ -110,8 +110,8 @@ export function actionsForAgent(agent?: { templateId?: string | null; role?: str
   }
   if (/\b(travel|trip|itinerary)\b/.test(focus)) {
     return [
-      { type: "DAILY_CHECK_IN", label: "Plan next detail" },
-      { type: "REFLECTION_PROMPT", label: "Review itinerary" }
+      { type: "DAILY_CHECK_IN", label: "Discover destinations" },
+      { type: "REFLECTION_PROMPT", label: "Build travel itinerary" }
     ];
   }
   if (/\b(language|tutor|learning)\b/.test(focus)) {
@@ -124,6 +124,12 @@ export function actionsForAgent(agent?: { templateId?: string | null; role?: str
     return [
       { type: "DAILY_CHECK_IN", label: "Discover music" },
       { type: "REFLECTION_PROMPT", label: "Explore artist and lyrics" }
+    ];
+  }
+  if (/\b(content|social media|instagram|tiktok|youtube|copywriting|creator|marketing)\b/.test(focus)) {
+    return [
+      { type: "DAILY_CHECK_IN", label: "Create content strategy" },
+      { type: "REFLECTION_PROMPT", label: "Draft social content" }
     ];
   }
 
@@ -188,6 +194,38 @@ function workflowDetail(label: string, role: string) {
       requiredInformation: ["thesis", "catalysts", "invalidation", "timeframe", "risk assumptions"],
       completionCriteria: "A falsifiable thesis and risk checklist are saved.",
       safetyConstraints: ["Not financial advice", "Do not guarantee outcomes", "Do not recommend trade execution"]
+    },
+    "Create content strategy": {
+      description: "Build a channel-specific content strategy around the user's audience and goals.",
+      starterQuestion: "Which platform are you creating for, who is the audience, what outcome do you want, and what topics or brand voice should guide the content?",
+      workflowInstructions: "Gather platform, audience, objective, topics, format constraints, publishing cadence, and voice. Create a focused content pillar plan with several practical post ideas. Clearly label assumptions and ask for approval before treating any idea as final.",
+      requiredInformation: ["platform", "target audience", "content goal", "topics or offers", "brand voice", "format constraints"],
+      completionCriteria: "The user has approved a focused content strategy and a shortlist of usable ideas.",
+      safetyConstraints: ["Do not impersonate people or brands", "Avoid deceptive engagement tactics", "Label assumptions about audience trends"]
+    },
+    "Draft social content": {
+      description: "Turn a selected idea into a platform-ready social-media draft.",
+      starterQuestion: "Which idea should we draft, which platform is it for, and what tone, call to action, or length should the post use?",
+      workflowInstructions: "Confirm the platform, audience, idea, tone, and call to action. Draft copy that fits the requested format, then offer concise alternatives or hooks. Ask the user to review factual claims and brand wording before finalizing.",
+      requiredInformation: ["platform", "content idea", "audience", "tone", "call to action", "length or format"],
+      completionCriteria: "A reviewed, platform-appropriate draft is ready for the user to publish or refine.",
+      safetyConstraints: ["Do not invent facts, endorsements, or statistics", "Avoid misleading claims", "The user remains responsible for publication"]
+    },
+    "Discover destinations": {
+      description: "Recommend destinations that fit the user's trip style, timing, and practical constraints.",
+      starterQuestion: "Which country or region are you considering, when do you want to travel, what is your budget range, and what kind of experiences matter most to you?",
+      workflowInstructions: "Collect the country or region, travel dates, trip length, budget, traveller mix, interests, pace, and constraints. Compare a small set of destination options with clear reasons they fit. Flag any assumption and avoid claiming live prices, availability, or entry requirements without a verified source.",
+      requiredInformation: ["country or region", "dates or season", "trip length", "budget", "traveller preferences", "interests and constraints"],
+      completionCriteria: "The user has selected or narrowed down destinations that match their trip goals.",
+      safetyConstraints: ["Do not claim live prices or availability without verification", "Advise the user to check official visa, health, and safety guidance", "Do not guarantee travel outcomes"]
+    },
+    "Build travel itinerary": {
+      description: "Turn chosen destinations into a realistic, preference-aware travel itinerary.",
+      starterQuestion: "What destination and dates should we plan for, how many days do you have, and what pace, interests, or must-see experiences should shape the itinerary?",
+      workflowInstructions: "Confirm destination, dates, trip length, arrival and departure points, budget, pace, interests, and accessibility needs. Build a balanced day-by-day outline with flexible alternatives and practical travel notes. Keep booking, visa, safety, and opening-hour information explicitly subject to user verification.",
+      requiredInformation: ["destination", "dates", "trip length", "arrival and departure", "budget", "pace and interests", "constraints"],
+      completionCriteria: "A practical itinerary with priorities, pacing, and next booking or research steps is agreed.",
+      safetyConstraints: ["Do not claim live transport, booking, visa, or opening-hour information without verification", "Encourage checking official local safety guidance", "Do not guarantee availability"]
     }
   };
   return specifics[label] ?? defaults;

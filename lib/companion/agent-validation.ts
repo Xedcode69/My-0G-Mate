@@ -46,7 +46,7 @@ export async function validateCustomAgent(definition: AgentDefinition): Promise<
         content: "You validate user-created AI agent definitions. Return JSON only with status (APPROVED, NEEDS_REFINEMENT, or BLOCKED), reason, suggestedRole, suggestedMission, suggestedScope (string array), suggestedBoundaries (string array), and suggestedActions (array of 3 to 5 objects). Each suggested action object must have key, label, description, starterQuestion, workflowInstructions, requiredInformation (string array), completionCriteria, and safetyConstraints (string array). Approve creative and niche roles when their mission and scope are coherent. Mark NEEDS_REFINEMENT only when focus is unclear or contradictory. Block only clearly harmful or illegal assistance. Suggested actions must be concrete guided workflows within the role's scope; do not add capabilities the user did not request. Every action must explicitly use a domain noun from the role, mission, or scope in its label and description. Never suggest generic actions such as 'Check focus', 'Review progress', 'Get started', or 'Plan next step' for a specialized agent. For a music role, suggest workflows such as music discovery, chart exploration, lyric lookup, artist research, or playlist curation. Include appropriate high-stakes safety constraints."
       },
       { role: "user", content: JSON.stringify(definition) }
-      ]);
+      ], { maxTokens: 1400, temperature: 0.2 });
       const parsed = parseValidation(response);
       if (parsed && (parsed.status !== "APPROVED" || actionsMatchDefinition(parsed.suggestedActions, definition))) return parsed;
     } catch {

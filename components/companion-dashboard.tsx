@@ -238,6 +238,7 @@ export function CompanionDashboard() {
       return;
     }
     setBusy(true);
+    setStatus("Requesting 0G mainnet registration transaction…");
     try {
       const provider = await signingWallet.getEthereumProvider();
       const registration = await registerCompanionOnchain(provider, active.customTypeName || activeTypeLabel);
@@ -444,6 +445,7 @@ export function CompanionDashboard() {
                     <div>Storage: {chainStatus?.storageConfigured ? "0G configured" : "Local fallback"}</div>
                   </div>
                 </div>
+                {status && <div role="status" className="rounded-lg border border-black/10 bg-white px-3 py-2 text-xs leading-relaxed text-black/65">{status}</div>}
                 {profileEditing && <button onClick={saveProfile} disabled={profileBusy} className="flex w-full items-center justify-center gap-2 rounded-lg bg-ink px-3 py-2.5 text-sm font-medium text-white disabled:opacity-50"><Save className="h-4 w-4" /> Save changes</button>}
                 <button onClick={() => { setProfileOpen(false); router.push("/onboarding"); }} className="flex w-full items-center justify-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2.5 text-sm font-medium hover:bg-paper"><Plus className="h-4 w-4" /> Add companion</button>
                 {active && !active.blockchainId && <button onClick={() => void registerActiveCompanionOnchain()} disabled={busy || !browserRegistryConfig} title={browserRegistryConfig ? undefined : "Restart the app after setting NEXT_PUBLIC_COMPANION_REGISTRY_ADDRESS and NEXT_PUBLIC_ZERO_G_CHAIN_ID"} className="w-full rounded-lg border border-black/10 bg-white px-3 py-2.5 text-sm font-medium hover:bg-paper disabled:cursor-not-allowed disabled:opacity-50">{browserRegistryConfig ? `Register ${active.name} on 0G` : "Register on 0G (restart required)"}</button>}

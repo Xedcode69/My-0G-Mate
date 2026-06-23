@@ -1,72 +1,188 @@
 # MyMate
 
-MyMate is a V1 AI companion platform scaffold focused on persistent memory, relationship growth, mood, companion evolution, guided agent workflows, and future-ready blockchain and 0G Storage boundaries.
+MyMate is a privacy-focused AI companion platform. Users can create persistent companions or role-specialized AI agents that guide workflows, remember meaningful context, and preserve encrypted archives on 0G Storage.
 
-## Quick Start
+Each companion can have a clear role, mission, scope, boundaries, personality, memories, goals, and role-specific actions. Ownership can be registered with a user wallet on 0G mainnet, while encrypted archive root hashes can be anchored on-chain without publishing readable conversations.
+
+## Main capabilities
+
+- Create general companions or focused agents such as fitness coaches, travel guides, study partners, content assistants, and custom roles.
+- Define a custom agent's role, mission, scope, boundaries, and response style.
+- Generate role-aware guided workflows with structured plans, recommendations, checklists, and summaries.
+- Maintain conversation history, preferences, decisions, goals, projects, feedback, and other meaningful memories.
+- Present living portrait states based on companion activity and conversation tone.
+- Encrypt companion archives with a per-user/per-companion derived key before uploading to 0G Storage.
+- Register companion ownership through a user wallet and anchor encrypted archive versions on 0G mainnet.
+- Use 0G Compute through its OpenAI-compatible Router API, with private-provider and TEE-verification settings.
+
+## Technology
+
+- Next.js 15, React, TypeScript, and Tailwind CSS.
+- PostgreSQL with Prisma ORM.
+- Privy and WalletConnect for sign-in, embedded wallets, and external wallet support.
+- 0G Compute Router for companion and workflow inference.
+- `@0gfoundation/0g-ts-sdk` for encrypted archive uploads to 0G Storage.
+- ethers.js and Solidity for 0G mainnet ownership and archive anchoring.
+
+## Local setup
+
+### 1. Install dependencies
 
 ```bash
 npm install
+```
+
+### 2. Configure environment variables
+
+Copy the example file:
+
+```bash
 cp .env.example .env
-npm run prisma:generate
-npm run prisma:migrate
+```
+
+Fill in the required values in `.env`. See `.env.example` for all available settings.
+
+At minimum, local development needs:
+
+```env
+DATABASE_URL="postgresql://..."
+NEXT_PUBLIC_PRIVY_APP_ID="..."
+```
+
+To use 0G Compute, Storage, and on-chain ownership, configure the corresponding `ZERO_G_*`, `NEXT_PUBLIC_*`, and `CRON_SECRET` values as well.
+
+### 3. Prepare the database
+
+```bash
+npx prisma generate
+npx prisma migrate dev
+```
+
+For production, use this instead:
+
+```bash
+npx prisma migrate deploy
+```
+
+### 4. Run the app
+
+```bash
 npm run dev
 ```
 
-The app runs at `http://localhost:3000`.
+Open `http://localhost:3000`.
 
-## What Is Implemented
+## User guide
 
-- Privy sign up/login starter page with email, wallet login, and embedded wallet creation.
-- Wallet identity passed into companion APIs from the authenticated Privy account.
-- Companion creation with four companion archetypes.
-- Prisma schema for users, companions, memories, profiles, activities, chats, and memory snapshots.
-- AI chat route with in-character system prompt, recent chat context, important memories, relationship updates, memory extraction, personality adaptation, workflow completion, and evolution checks.
-- Activity route for daily check-in, feeding, reflection prompts, companion questions, and mood guessing.
-- Encrypted memory snapshot service with a 0G Storage adapter boundary.
-- CompanionRegistry Solidity contract for ownership and evolution milestones.
-- Responsive dashboard and companion interaction UI.
+### 1. Sign in and connect a wallet
 
-Provider credentials are optional during local development. Without an LLM key or 0G configuration, deterministic local fallbacks keep the core workflow usable.
+1. Open MyMate.
+2. Sign in with email or connect a wallet through Privy.
+3. Use the same wallet whenever you want to register companions or anchor archives on 0G.
+4. For 0G mainnet actions, switch the wallet to the configured 0G chain and keep a small amount of native 0G available for gas.
 
-## Authentication
+### 2. Create a companion
 
-The first screen is a dedicated starter page powered by Privy. Set `NEXT_PUBLIC_PRIVY_APP_ID` in `.env`, then users can sign up or log in with email or wallet. Privy creates embedded wallets for users who do not already have one, and the dashboard uses that wallet address for companion ownership.
+1. Select **Add companion** from the profile menu or complete onboarding.
+2. Choose a companion type and avatar.
+3. Give it a name.
+4. Select a built-in role template, or choose **Custom agent**.
+5. For a custom agent, enter its role, mission, and focused scope.
+6. Select **Validate agent design**. MyMate checks the definition and asks the model for 2–4 role-specific workflows.
+7. Review the suggested workflows and create the companion.
 
-## 0G Storage
+If the 0G registry is configured, MyMate asks the wallet to register ownership. If the request is skipped or fails, the companion still works and can be registered later from the profile menu.
 
-Memory snapshots are generated from important memories, relationship scores, and personality state. The snapshot JSON is encrypted locally with `MEMORY_ENCRYPTION_KEY`, then uploaded through the 0G TypeScript SDK from `lib/zero-g/storage.ts`.
+### 3. Chat and complete workflows
 
-The adapter follows the SDK pattern for in-memory uploads:
+1. Select a companion from the left rail.
+2. Use the chat composer for normal conversation.
+3. Select an **Agent action** to start a focused workflow.
+4. Answer the companion's follow-up questions one at a time.
+5. When the workflow has enough information, the companion can return a structured result such as a plan, checklist, recommendation set, or summary.
+6. Use message feedback controls to mark replies helpful, unhelpful, or corrected. This creates learning context for the companion.
 
-- build a `MemData` object from the encrypted snapshot bytes
-- calculate the Merkle tree before upload
-- create an `Indexer` with `ZERO_G_INDEXER_RPC`
-- sign with an `ethers.Wallet` connected to `ZERO_G_EVM_RPC`
-- call `indexer.upload(...)` with AES-256 upload encryption enabled
-- store the returned `rootHash` in `memory_snapshots`
+### 4. Review companion context
 
-Required 0G environment variables:
+The dashboard shows the active companion's role, current mood, relationship state, workflow actions, recent memories, goals, and archive state. The profile menu lets you edit your display name, add a companion, and access 0G ownership/archive actions.
 
-```bash
-ZERO_G_EVM_RPC="https://evmrpc-testnet.0g.ai"
-ZERO_G_INDEXER_RPC="https://indexer-storage-testnet-turbo.0g.ai"
-ZERO_G_STORAGE_PRIVATE_KEY="..."
-ZERO_G_STORAGE_ENCRYPTION_KEY="base64-encoded-32-byte-key"
-```
+### 5. Create and check an encrypted archive
 
-If those are missing, the API returns a deterministic `local-*` root hash so development can continue without uploading private memory data.
+Companion changes queue archive jobs after actions such as conversation, feedback, workflow starts/completions, and goal/project creation.
 
-## Automated archives and 0G Chain ownership
+Archive states in the profile menu mean:
 
-Companion changes queue encrypted archive jobs. A scheduler should call `POST /api/cron/archives` with `Authorization: Bearer <CRON_SECRET>` every few minutes. `ARCHIVE_DEBOUNCE_SECONDS` controls how long the worker waits to batch recent changes.
+- `Queued (pending)`: waiting for the archive worker.
+- `Queued (processing)`: being encrypted and uploaded.
+- `v1 · not anchored`: uploaded to 0G Storage, but not yet recorded on-chain.
+- `v1 · anchored`: uploaded and its root hash has been anchored on 0G mainnet.
 
-For user-signed 0G Chain ownership, deploy `contracts/CompanionRegistry.sol` to 0G mainnet, then configure:
+Use **Snapshot** for an immediate archive upload. Automatic processing uses the protected archive worker and `ARCHIVE_DEBOUNCE_SECONDS` to batch frequent changes.
 
-```bash
-NEXT_PUBLIC_COMPANION_REGISTRY_ADDRESS="0x..."
-NEXT_PUBLIC_ZERO_G_CHAIN_ID="..."
+### 6. Register ownership and anchor an archive
+
+1. Open the profile menu while the relevant companion is active.
+2. Select **Register [companion] on 0G** if the companion is not registered.
+3. Approve the wallet transaction.
+4. Wait for an archive to show an archive version such as `v1 · not anchored`.
+5. Select **Sync latest archive to 0G**.
+6. Approve the wallet transaction to anchor the encrypted root hash and archive version.
+
+The chain receives ownership information and encrypted archive references only. It never receives plaintext chats, memories, or encryption keys.
+
+## 0G Storage configuration
+
+MyMate encrypts a complete companion archive before upload. The encryption key is derived from the app master key, the user's wallet address, and the companion ID, so one companion's archive cannot be decrypted with another companion's derived key.
+
+Required production variables:
+
+```env
+MEMORY_ENCRYPTION_KEY="base64-encoded-32-byte-key"
+ZERO_G_EVM_RPC="https://evmrpc.0g.ai"
+ZERO_G_INDEXER_RPC="https://indexer-storage-turbo.0g.ai"
+ZERO_G_STORAGE_PRIVATE_KEY="0x..."
 CRON_SECRET="long-random-secret"
-ARCHIVE_DEBOUNCE_SECONDS="300"
 ```
 
-Users register companions and explicitly anchor the latest encrypted archive root hash from the profile menu. The chain stores ownership and encrypted archive references only; it never stores plaintext memory or encryption keys.
+`ZERO_G_STORAGE_PRIVATE_KEY` belongs to a dedicated, funded backend wallet used only to pay Storage upload fees. Never expose it through a `NEXT_PUBLIC_` variable.
+
+## Automated archive worker
+
+The archive worker endpoint is:
+
+```text
+GET /api/cron/archives
+```
+
+It requires:
+
+```text
+Authorization: Bearer <CRON_SECRET>
+```
+
+`vercel.json` schedules it every five minutes. On Vercel Hobby, use a supported daily schedule or an external scheduler; Vercel Cron invokes the route with `GET`.
+
+## 0G mainnet ownership
+
+Deploy `contracts/CompanionRegistry.sol` to 0G mainnet, then set:
+
+```env
+NEXT_PUBLIC_CHAIN_ID="16661"
+NEXT_PUBLIC_COMPANION_REGISTRY_ADDRESS="0x..."
+```
+
+The wallet must be connected to the same configured 0G chain before registration or archive anchoring can proceed.
+
+## Next updates
+
+- **Structured outputs and response formatting:** Expand the existing plan, checklist, recommendation, research, and summary cards into richer role-aware deliverables with stronger validation, export options, and reusable workflow templates.
+- **UI/UX improvements:** Refine dashboard density, mobile layouts, archive/transaction feedback, workflow progress, empty states, companion switching, and accessible interaction states.
+- **Multimedia support:** Let companions work with images, documents, voice, and other attachments so workflows can use visual references, uploaded material, and richer conversation inputs.
+- **Multi-model support:** Add configurable model routing for different tasks, allowing users or system policies to select suitable models for normal chat, structured workflow generation, memory processing, image generation, and fallback handling.
+
+## Security notes
+
+- Never commit `.env` or share private keys, API keys, encryption keys, or `DATABASE_URL`.
+- `NEXT_PUBLIC_*` variables are visible to the browser. Use them only for public configuration such as chain IDs and contract addresses.
+- Rotate encryption keys only with a migration/re-encryption plan; old archives depend on the key used when they were created.
+- Use separate database, service-wallet, and provider credentials for development, preview, and production environments.

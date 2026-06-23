@@ -173,6 +173,13 @@ NEXT_PUBLIC_COMPANION_REGISTRY_ADDRESS="0x..."
 
 The wallet must be connected to the same configured 0G chain before registration or archive anchoring can proceed.
 
+## Next updates
+
+- **Structured outputs and response formatting:** Expand the existing plan, checklist, recommendation, research, and summary cards into richer role-aware deliverables with stronger validation, export options, and reusable workflow templates.
+- **UI/UX improvements:** Refine dashboard density, mobile layouts, archive/transaction feedback, workflow progress, empty states, companion switching, and accessible interaction states.
+- **Multimedia support:** Let companions work with images, documents, voice, and other attachments so workflows can use visual references, uploaded material, and richer conversation inputs.
+- **Multi-model support:** Add configurable model routing for different tasks, allowing users or system policies to select suitable models for normal chat, structured workflow generation, memory processing, image generation, and fallback handling.
+
 ## Security notes
 
 - Never commit `.env` or share private keys, API keys, encryption keys, or `DATABASE_URL`.

@@ -12,7 +12,7 @@ const registryInterface = new Interface(abi);
 
 export function companionRegistryConfig() {
   const address = process.env.NEXT_PUBLIC_COMPANION_REGISTRY_ADDRESS;
-  const chainId = Number(process.env.NEXT_PUBLIC_ZERO_G_CHAIN_ID || process.env.NEXT_PUBLIC_BLOCKCHAIN_CHAIN_ID);
+  const chainId = Number(process.env.NEXT_PUBLIC_ZERO_G_CHAIN_ID || process.env.NEXT_PUBLIC_BLOCKCHAIN_CHAIN_ID || process.env.NEXT_PUBLIC_CHAIN_ID);
   if (!address || !chainId) return null;
   return { address, chainId };
 }

@@ -9,12 +9,13 @@ export type StructuredResult = {
 export function extractStructuredResult(response: string) {
   const match = response.match(/\s*\[\[STRUCTURED_RESULT:\s*([\s\S]*?)\s*\]\]\s*/);
   if (!match) return { response, structuredOutput: null as StructuredResult | null };
+  const cleanedResponse = response.replace(match[0], "").trim();
   try {
     const parsed = JSON.parse(match[1]);
-    if (!isStructuredResult(parsed)) return { response: response.replace(match[0], "").trim(), structuredOutput: null as StructuredResult | null };
-    return { response: response.replace(match[0], "").trim(), structuredOutput: parsed };
+    if (!isStructuredResult(parsed)) return { response: cleanedResponse, structuredOutput: null as StructuredResult | null };
+    return { response: cleanedResponse, structuredOutput: parsed };
   } catch {
-    return { response, structuredOutput: null as StructuredResult | null };
+    return { response: cleanedResponse, structuredOutput: null as StructuredResult | null };
   }
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Archive, Bot, Brain, CircleUserRound, Heart, ImageUp, Loader2, MessageCircle, MessageSquarePlus, Pencil, Plus, Save, Sparkles, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
@@ -549,7 +549,7 @@ export function CompanionDashboard() {
                 <div className="flex items-start gap-2">
                   <MessageAvatar label={active?.name ?? "Companion"} image={active?.generatedPortrait || active?.avatarImage} kind="companion" />
                   <div className="chat-bubble chat-bubble--companion max-w-[78%] rounded-lg bg-paper px-3 py-2 text-sm">
-                    {chat.companionResponse}
+                    <FormattedAssistantMessage content={chat.companionResponse} />
                     {feedbackByChat[chat.id] ? (
                       <div className="mt-2 text-xs text-black/45">Feedback: {feedbackByChat[chat.id].toLowerCase()}</div>
                     ) : correctionChatId === chat.id ? (
@@ -680,6 +680,92 @@ function StructuredResultCard({ result, onFollowUp }: { result: StructuredResult
       {result.followUps && result.followUps.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{result.followUps.map((followUp) => <button key={followUp} onClick={() => onFollowUp(followUp)} className="rounded-full border border-black/10 bg-white px-2.5 py-1 text-xs font-medium hover:bg-paper">{followUp}</button>)}</div>}
     </section>
   );
+}
+
+function FormattedAssistantMessage({ content }: { content: string }) {
+  const lines = normalizeAssistantText(content).split("\n").map((line) => line.trim()).filter(Boolean);
+
+  if (lines.length === 0) return null;
+
+  return (
+    <div className="assistant-response space-y-2 leading-6 text-ink">
+      {lines.map((line, index) => {
+        if (/^-{3,}$/.test(line)) {
+          return <div key={`${line}-${index}`} className="my-2 border-t border-black/10" />;
+        }
+
+        const heading = line.match(/^(#{2,4})\s+(.+)$/);
+        if (heading) {
+          return (
+            <h4 key={`${line}-${index}`} className="pt-1 text-sm font-semibold text-ink">
+              {renderInlineFormatting(heading[2])}
+            </h4>
+          );
+        }
+
+        const numbered = line.match(/^(\d+)\.\s+(.+)$/);
+        if (numbered) {
+          return (
+            <div key={`${line}-${index}`} className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-2">
+              <span className="mt-0.5 grid h-5 w-5 place-items-center rounded-full bg-white text-[11px] font-semibold text-black/55">{numbered[1]}</span>
+              <div>{renderInlineFormatting(numbered[2])}</div>
+            </div>
+          );
+        }
+
+        const bullet = line.match(/^[-•]\s+(.+)$/);
+        if (bullet) {
+          return (
+            <div key={`${line}-${index}`} className="grid grid-cols-[0.75rem_minmax(0,1fr)] gap-2">
+              <span className="mt-2 h-1.5 w-1.5 rounded-full bg-mint" />
+              <div>{renderInlineFormatting(bullet[1])}</div>
+            </div>
+          );
+        }
+
+        const isShortLabel = /^\*\*[^*]{1,70}:\*\*$/.test(line);
+        if (isShortLabel) {
+          return <div key={`${line}-${index}`} className="pt-1 font-semibold">{renderInlineFormatting(line)}</div>;
+        }
+
+        return <p key={`${line}-${index}`}>{renderInlineFormatting(line)}</p>;
+      })}
+    </div>
+  );
+}
+
+function normalizeAssistantText(content: string) {
+  return stripStructuredResultMarker(content)
+    .replace(/\r\n/g, "\n")
+    .replace(/\s*(#{2,4}\s+)/g, "\n\n$1")
+    .replace(/\s+---\s+/g, "\n\n---\n\n")
+    .replace(/\s+(\d+\.\s+\*\*)/g, "\n$1")
+    .replace(/\s+(\d+\.\s+)/g, "\n$1")
+    .replace(/\s+-\s+(?=[A-Z0-9*"“])/g, "\n- ")
+    .replace(/\s+(\*\*[^*\n]{1,70}:\*\*)/g, "\n$1")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function stripStructuredResultMarker(content: string) {
+  const markerStart = content.indexOf("[[STRUCTURED_RESULT:");
+  if (markerStart === -1) return content;
+
+  const markerEnd = content.indexOf("]]", markerStart);
+  if (markerEnd === -1) return content.slice(0, markerStart).trim();
+
+  return `${content.slice(0, markerStart)}${content.slice(markerEnd + 2)}`.trim();
+}
+
+function renderInlineFormatting(text: string): ReactNode {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, index) => {
+    const bold = part.match(/^\*\*([^*]+)\*\*$/);
+    if (bold) {
+      return <strong key={`${part}-${index}`} className="font-semibold">{bold[1]}</strong>;
+    }
+    return <Fragment key={`${part}-${index}`}>{part}</Fragment>;
+  });
 }
 
 function conversationTopic(message?: string) {
